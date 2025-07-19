@@ -10,13 +10,30 @@ A Flask-based REST API that provides virtual try-on functionality using the IDM-
 - File upload handling
 - CORS support for frontend integration
 - Health check and API information endpoints
+- TwelveLabs video processing integration
+- MongoDB storage for garments and results
+- Vellum AI recommendations
+- Test video integration for development
 
 ## Installation
 
 1. Install dependencies:
 
 ```bash
-uv add flask flask-cors werkzeug gradio-client requests
+uv add flask flask-cors werkzeug gradio-client requests pymongo python-dotenv twelvelabs
+```
+
+2. Set up environment variables (create a `.env` file):
+
+```bash
+# Required for TwelveLabs integration
+TWELVELABS_API_KEY=your_twelvelabs_api_key_here
+
+# Required for Vellum recommendations
+VELLUM_API_KEY=your_vellum_api_key_here
+
+# MongoDB connection (optional, has default)
+MONGODB_URI=your_mongodb_connection_string
 ```
 
 2. Make sure you have the required image files:
@@ -120,12 +137,83 @@ Perform virtual try-on with uploaded images or image URLs.
 
 Download generated images by providing the file path.
 
+### 5. Test TwelveLabs Integration
+
+**GET** `/test-twelvelabs`
+
+Test video download functionality using the provided test video URL.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Test video downloaded successfully",
+  "video_url": "https://videos.pexels.com/video-files/5058382/5058382-uhd_2560_1440_25fps.mp4",
+  "content_type": "video/mp4",
+  "content_length": "12345678",
+  "file_size_bytes": 12345678,
+  "file_size_mb": 11.77
+}
+```
+
+**POST** `/test-twelvelabs`
+
+Test full TwelveLabs integration with video processing and frame analysis.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "best_frame": {
+    "video_id": "video_123",
+    "score": 0.95,
+    "start": 2.5,
+    "end": 3.0
+  },
+  "video_id": "video_123",
+  "message": "Test video processed successfully with TwelveLabs"
+}
+```
+
+### 6. Preset Garments
+
+**GET** `/preset-garments`
+
+Get available preset garments for testing.
+
+### 7. Upload Custom Garment
+
+**POST** `/upload-garment`
+
+Upload a custom garment image to MongoDB.
+
+### 8. User History
+
+**GET** `/user-history/<user_id>`
+
+Get user's try-on history from MongoDB.
+
 ## Testing the API
 
 Run the test script to verify the API functionality:
 
 ```bash
 uv run python test_api.py
+```
+
+### Testing TwelveLabs Integration
+
+Test the new TwelveLabs functionality:
+
+```bash
+# Test video download
+uv run python test_twelvelabs.py
+
+# Or test manually with curl:
+curl http://localhost:5000/test-twelvelabs
+curl -X POST http://localhost:5000/test-twelvelabs
 ```
 
 ## Example Usage
@@ -212,3 +300,5 @@ The API returns appropriate HTTP status codes and error messages:
 - Processing may take some time depending on the model's current load
 - Generated images are stored in temporary locations and should be downloaded promptly
 - CORS is enabled for frontend integration
+- TwelveLabs integration uses the official Python SDK for video processing
+- The system automatically creates indexes and manages video uploads through the SDK

@@ -142,7 +142,7 @@ cd HT6-Team
 ```bash
 cd backend
 uv add flask flask-cors werkzeug gradio-client requests pymongo python-dotenv
-uv run -- flask run -p 3000
+uv run -- flask run -p 5000
 ```
 
 ### 3. Frontend Setup
@@ -169,7 +169,7 @@ FLASK_ENV=development
 **Frontend (.env)**
 
 ```env
-VITE_API_URL=http://localhost:3000
+VITE_API_URL=http://localhost:5000
 VITE_VELLUM_API_KEY=your_vellum_api_key
 VITE_TWELVELABS_API_KEY=your_twelvelabs_api_key
 ```
@@ -378,23 +378,23 @@ uv run python test_api.py
 
 ```bash
 # Health check
-curl http://localhost:3000/health
+curl http://localhost:5000/health
 
 # Get preset garments
-curl http://localhost:3000/preset-garments
+curl http://localhost:5000/preset-garments
 
 # Upload custom garment
-curl -X POST http://localhost:3000/upload-garment \
+curl -X POST http://localhost:5000/upload-garment \
   -F "garment_image=@garment.jpg" \
   -F "user_id=user123" \
   -F "description=Blue shirt"
 
 # Process video
-curl -X POST http://localhost:3000/process-video \
+curl -X POST http://localhost:5000/process-video \
   -F "video_file=@recording.mp4"
 
 # Virtual try-on
-curl -X POST http://localhost:3000/tryon \
+curl -X POST http://localhost:5000/tryon \
   -d "person_image_path=/path/to/frame.jpg" \
   -d "garment_id=blue_shirt" \
   -d "user_id=user123"

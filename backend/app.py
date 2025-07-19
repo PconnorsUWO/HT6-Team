@@ -10,12 +10,16 @@ import json
 from datetime import datetime
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from twelvelabs import TwelveLabs
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS for development - more permissive
+CORS(app, 
+     origins=["*"])
 
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
@@ -25,17 +29,30 @@ if not os.path.exists(UPLOAD_FOLDER):
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# Initialize clients
-tryon_client = Client("yisol/IDM-VTON")
-
-# MongoDB connection
-MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb+srv://dbUser:1234567890@cluster0.iic7hii.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
-mongo_client = MongoClient(MONGODB_URI)
-db = mongo_client.virtual_tryon
 
 # API Keys
 VELLUM_API_KEY = os.getenv('VELLUM_API_KEY')
 TWELVELABS_API_KEY = os.getenv('TWELVELABS_API_KEY')
+
+# Initialize clients
+try:
+    tryon_client = Client("yisol/IDM-VTON")
+    print("✅ Try-on client initialized successfully")
+except Exception as e:
+    print(f"⚠️ Warning: Could not initialize try-on client: {e}")
+    tryon_client = None
+
+# Initialize TwelveLabs client
+twelvelabs_client = TwelveLabs(api_key=TWELVELABS_API_KEY) if TWELVELABS_API_KEY else None
+
+# MongoDB connection
+MONGODB_URI = os.getenv('MONGODB_URI')
+mongo_client = MongoClient(MONGODB_URI)
+db = mongo_client.virtual_tryon
+
+
+# Test video URL for TwelveLabs testing
+TEST_VIDEO_URL = "https://videos.pexels.com/video-files/5058382/5058382-uhd_2560_1440_25fps.mp4"
 
 # Preset garments (to be expanded)
 PRESET_GARMENTS = [
@@ -77,18 +94,146 @@ PRESET_GARMENTS = [
     }
 ]
 
+def get_full_video_metadata(file_path: str) -> dict:
+    """Get complete video metadata using ffprobe"""
+    import subprocess
+    import json
+    
+    cmd = [
+        'ffprobe',
+        '-v', 'error',
+        '-print_format', 'json',
+        '-show_format',
+        '-show_streams',
+        file_path
+    ]
+
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    if result.returncode != 0:
+        raise RuntimeError(f"ffprobe error: {result.stderr}")
+
+    return json.loads(result.stdout)
+
+def get_video_duration(video_path):
+    """Get video duration in seconds using ffprobe"""
+    try:
+        metadata = get_full_video_metadata(video_path)
+        
+        # Try to get duration from format first (works well with MP4)
+        if 'format' in metadata and 'duration' in metadata['format']:
+            duration = float(metadata['format']['duration'])
+            print(f"Duration from format metadata: {duration} seconds")
+            return duration
+        
+        # For video files, try to get duration from video stream
+        if 'streams' in metadata and len(metadata['streams']) > 0:
+            # Find the video stream
+            video_stream = next((s for s in metadata['streams'] if s.get('codec_type') == 'video'), None)
+            
+            if video_stream:
+                # Try to get duration from stream duration
+                if 'duration' in video_stream:
+                    duration = float(video_stream['duration'])
+                    print(f"Duration from video stream: {duration} seconds")
+                    return duration
+                
+                # Try to get duration from tags
+                if 'tags' in video_stream and 'DURATION' in video_stream['tags']:
+                    duration_str = video_stream['tags']['DURATION']
+                    try:
+                        import re
+                        match = re.match(r'(\d+):(\d+):(\d+\.\d+)', duration_str)
+                        if match:
+                            hours, minutes, seconds = match.groups()
+                            duration = float(hours) * 3600 + float(minutes) * 60 + float(seconds)
+                            print(f"Duration from stream tags: {duration} seconds")
+                            return duration
+                    except:
+                        pass
+        
+        # If we can't get exact duration, raise an error
+        raise ValueError("Could not determine exact video duration from metadata")
+        
+    except FileNotFoundError:
+        raise FileNotFoundError("ffprobe not found. Please install ffmpeg.")
+    except Exception as e:
+        raise Exception(f"Error getting video duration: {e}")
+
+def get_video_info(video_path):
+    """Get comprehensive video information for debugging"""
+    try:
+        metadata = get_full_video_metadata(video_path)
+        
+        # Extract video stream info
+        video_stream = next((s for s in metadata['streams'] if s.get('codec_type') == 'video'), None)
+        
+        info = {
+            'file_path': video_path,
+            'format': metadata.get('format', {}),
+            'video_stream': video_stream,
+            'all_streams': metadata.get('streams', [])
+        }
+        
+        if video_stream:
+            info.update({
+                'codec': video_stream.get('codec_name'),
+                'resolution': f"{video_stream.get('width')}x{video_stream.get('height')}",
+                'fps': video_stream.get('r_frame_rate'),
+                'duration_from_stream': video_stream.get('duration'),
+                'tags': video_stream.get('tags', {})
+            })
+        
+        return info
+        
+    except Exception as e:
+        return {'error': str(e)}
+
+    
 def allowed_file(filename):
     """Check if file extension is allowed"""
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov', 'avi'}
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    # For video files, allow MP4 and WebM (fallback support)
+    VIDEO_EXTENSIONS = {'mp4', 'webm'}
+    # For image files, allow common formats
+    IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+    
+    if '.' in filename:
+        ext = filename.rsplit('.', 1)[1].lower()
+        # Check if it's a video extension
+        if ext in VIDEO_EXTENSIONS:
+            return True
+        # Check if it's an image extension
+        if ext in IMAGE_EXTENSIONS:
+            return True
+    return False 
 
-@app.route('/health', methods=['GET'])
+@app.route('/health', methods=['GET', 'OPTIONS'])
 def health_check():
     """Health check endpoint"""
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+        return response
+    
     return jsonify({
         "status": "healthy", 
         "message": "Virtual Try-On API is running",
-        "features": ["video_recording", "twelvelabs_integration", "mongodb_storage", "vellum_recommendations"]
+        "features": ["video_recording", "twelvelabs_integration", "mongodb_storage", "vellum_recommendations"],
+        "test_endpoints": {
+            "test_video_download": "GET /test-twelvelabs",
+            "test_twelvelabs_full": "POST /test-twelvelabs"
+        }
+    })
+
+@app.route('/test', methods=['GET'])
+def test_endpoint():
+    """Simple test endpoint to verify CORS is working"""
+    return jsonify({
+        "message": "Backend is running and CORS is working!",
+        "timestamp": datetime.utcnow().isoformat()
     })
 
 @app.route('/preset-garments', methods=['GET'])
@@ -98,6 +243,8 @@ def get_preset_garments():
         "success": True,
         "garments": PRESET_GARMENTS
     })
+
+
 
 @app.route('/upload-garment', methods=['POST'])
 def upload_garment():
@@ -154,51 +301,102 @@ def process_video():
             return jsonify({"error": "No file selected"}), 400
         
         if not allowed_file(video_file.filename):
-            return jsonify({"error": "Invalid file type. Only MP4, MOV, AVI are allowed"}), 400
+            return jsonify({"error": "Invalid file type. Only MP4 and WebM formats are supported"}), 400
         
-        # Save video temporarily
-        video_filename = secure_filename(f"video_{uuid.uuid4()}.mp4")
+        # Save video temporarily with correct extension
+        file_extension = video_file.filename.rsplit('.', 1)[1].lower() if '.' in video_file.filename else 'webm'
+        video_filename = secure_filename(f"video_{uuid.uuid4()}.{file_extension}")
         video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
         video_file.save(video_path)
+
+        # # Get the exact video duration
+        # try:
+        #     duration = get_video_duration(video_path)
+        #     print(f"Video duration: {duration} seconds")
+            
+        #     # Validate duration is reasonable
+        #     if duration <= 0 or duration > 3600:
+        #         os.remove(video_path)
+        #         return jsonify({
+        #             "error": f"Video duration ({duration} seconds) is invalid. Must be between 0 and 3600 seconds."
+        #         }), 400
+                
+        # except Exception as e:
+        #     os.remove(video_path)
+        #     return jsonify({
+        #         "error": f"Failed to determine video duration: {str(e)}"
+        #     }), 400
         
-        # Upload to TwelveLabs for processing
-        headers = {
-            'Authorization': f'Bearer {TWELVELABS_API_KEY}',
-            'Content-Type': 'application/json'
-        }
+        # Upload to TwelveLabs using the SDK
+        if not twelvelabs_client:
+            print("TwelveLabs API key not configured, returning mock response")
+            # Clean up video file
+            os.remove(video_path)
+            # Return a mock response for testing
+            return jsonify({
+                "success": True,
+                "best_frame": {
+                    "video_id": "mock_video_123",
+                    "score": 0.95,
+                    "start": 2.0,
+                    "end": 2.5
+                },
+                "message": "Video processed successfully (mock response)"
+            })
         
-        # Upload video to TwelveLabs
-        with open(video_path, 'rb') as f:
-            files = {'file': f}
-            upload_response = requests.post(
-                'https://api.twelvelabs.io/v1.1/tasks',
-                headers={'Authorization': f'Bearer {TWELVELABS_API_KEY}'},
-                files=files,
-                data={'index_id': 'your_index_id'}  # You'll need to create an index
+        # Get or create an index
+        try:
+            indexes = twelvelabs_client.index.list()
+            if indexes:
+                index_id = indexes[0].id
+            else:
+                # Create a new index if none exists
+                index = twelvelabs_client.index.create(
+                    name="virtual-tryon-index",
+                    engine_id="marengo2.5",
+                    model="gpt-4"
+                )
+                index_id = index.id
+        except Exception as e:
+            print(f"Error with index: {e}")
+            index_id = "default"
+        
+        # Upload the video
+        try:
+            task = twelvelabs_client.task.create(
+                index_id=index_id,
+                file=video_path
             )
-        
-        if upload_response.status_code != 200:
-            return jsonify({"error": "Failed to upload video to TwelveLabs"}), 500
+            
+            # Wait for the task to complete
+            import time
+            while True:
+                task_status = twelvelabs_client.task.retrieve(task.id)
+                
+                if task_status.status == "ready":
+                    video_id = task_status.video_id
+                    break
+                elif task_status.status == "failed":
+                    return jsonify({"error": "Video upload failed"}), 500
+                
+                time.sleep(2)
+            
+        except Exception as e:
+            return jsonify({"error": f"Failed to upload video to TwelveLabs: {str(e)}"}), 500
         
         # Search for frames where person is standing still
-        search_payload = {
-            "query": "person standing still, full body visible, good lighting",
-            "video_id": upload_response.json()['video_id'],
-            "search_options": ["visual", "conversation", "text_in_video"]
-        }
-        
-        search_response = requests.post(
-            'https://api.twelvelabs.io/v1.1/search',
-            headers=headers,
-            json=search_payload
-        )
-        
-        if search_response.status_code != 200:
-            return jsonify({"error": "Failed to search video frames"}), 500
+        try:
+            search_results = twelvelabs_client.search(
+                index_id=index_id,
+                query="person standing still, full body visible, good lighting",
+                video_ids=[video_id],
+                search_options=["visual", "conversation", "text_in_video"]
+            )
+        except Exception as e:
+            return jsonify({"error": f"Failed to search video frames: {str(e)}"}), 500
         
         # Get the best frame
-        search_results = search_response.json()
-        best_frame = search_results['data'][0] if search_results['data'] else None
+        best_frame = search_results.data[0] if search_results.data else None
         
         # Clean up video file
         os.remove(video_path)
@@ -210,6 +408,175 @@ def process_video():
             "success": True,
             "best_frame": best_frame,
             "message": "Video processed successfully"
+        })
+        
+    except Exception as e:
+        print(f"Error in process_video: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@app.route('/test-twelvelabs', methods=['GET', 'POST'])
+def test_twelvelabs():
+    """Test TwelveLabs with the provided video URL"""
+    try:
+        # For GET requests, just test video download
+        if request.method == 'GET':
+            return test_video_download()
+        
+        # For POST requests, test full TwelveLabs integration
+        if not TWELVELABS_API_KEY:
+            return jsonify({"error": "TwelveLabs API key not configured"}), 500
+        
+        # Download the test video
+        print(f"Downloading test video from: {TEST_VIDEO_URL}")
+        video_response = requests.get(TEST_VIDEO_URL, stream=True)
+        
+        if video_response.status_code != 200:
+            return jsonify({"error": "Failed to download test video"}), 500
+        
+        # Save video temporarily
+        video_filename = f"test_video_{uuid.uuid4()}.mp4"
+        video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
+        
+        with open(video_path, 'wb') as f:
+            for chunk in video_response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        
+        print(f"Video saved to: {video_path}")
+        
+        # Upload to TwelveLabs using the SDK
+        print("Uploading video to TwelveLabs...")
+        
+        # First, get or create an index
+        try:
+            indexes = twelvelabs_client.index.list()
+            if indexes:
+                index_id = indexes[0].id
+            else:
+                # Create a new index if none exists
+                index = twelvelabs_client.index.create(
+                    name="virtual-tryon-index",
+                    engine_id="marengo2.5",
+                    model="gpt-4"
+                )
+                index_id = index.id
+        except Exception as e:
+            print(f"Error with index: {e}")
+            # Use a default index ID
+            index_id = "default"
+        
+        # Upload the video
+        try:
+            task = twelvelabs_client.task.create(
+                index_id=index_id,
+                file=video_path
+            )
+            
+            print(f"Upload task created: {task.id}")
+            
+            # Wait for the task to complete
+            import time
+            while True:
+                task_status = twelvelabs_client.task.retrieve(task.id)
+                print(f"Task status: {task_status.status}")
+                
+                if task_status.status == "ready":
+                    video_id = task_status.video_id
+                    break
+                elif task_status.status == "failed":
+                    return jsonify({
+                        "error": "Video upload failed",
+                        "details": task_status
+                    }), 500
+                
+                time.sleep(2)
+            
+            print(f"Video uploaded successfully with ID: {video_id}")
+            
+        except Exception as e:
+            return jsonify({
+                "error": "Failed to upload video to TwelveLabs",
+                "details": str(e)
+            }), 500
+        
+        # Search for frames where person is standing still
+        try:
+            print("Searching for suitable frames...")
+            search_results = twelvelabs_client.search(
+                index_id=index_id,
+                query="person standing still, full body visible, good lighting",
+                video_ids=[video_id],
+                search_options=["visual"]
+            )
+            
+            print(f"Search completed, found {len(search_results.data)} results")
+            
+        except Exception as e:
+            return jsonify({
+                "error": "Failed to search video frames",
+                "details": str(e)
+            }), 500
+        
+        # Get the best frame
+        best_frame = search_results.data[0] if search_results.data else None
+        
+        # Clean up video file
+        os.remove(video_path)
+        
+        if not best_frame:
+            return jsonify({
+                "success": False,
+                "message": "No suitable frames found in video",
+                "search_results": search_results
+            }), 400
+        
+        return jsonify({
+            "success": True,
+            "best_frame": best_frame,
+            "video_id": video_id,
+            "message": "Test video processed successfully with TwelveLabs",
+            "search_results": search_results
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+def test_video_download():
+    """Test downloading the video from the provided URL"""
+    try:
+        print(f"Testing video download from: {TEST_VIDEO_URL}")
+        video_response = requests.get(TEST_VIDEO_URL, stream=True)
+        
+        if video_response.status_code != 200:
+            return jsonify({"error": "Failed to download test video"}), 500
+        
+        # Get video info
+        content_length = video_response.headers.get('content-length')
+        content_type = video_response.headers.get('content-type')
+        
+        # Save video temporarily
+        video_filename = f"test_video_{uuid.uuid4()}.mp4"
+        video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
+        
+        with open(video_path, 'wb') as f:
+            for chunk in video_response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        
+        # Get file size
+        file_size = os.path.getsize(video_path)
+        
+        # Clean up
+        os.remove(video_path)
+        
+        return jsonify({
+            "success": True,
+            "message": "Test video downloaded successfully",
+            "video_url": TEST_VIDEO_URL,
+            "content_type": content_type,
+            "content_length": content_length,
+            "file_size_bytes": file_size,
+            "file_size_mb": round(file_size / (1024 * 1024), 2)
         })
         
     except Exception as e:
@@ -239,6 +606,10 @@ def virtual_tryon():
             if not garment_doc:
                 return jsonify({"error": "Garment not found"}), 404
             garment_path = garment_doc['filepath']
+        
+        # Check if try-on client is available
+        if not tryon_client:
+            return jsonify({"error": "Try-on service is currently unavailable. Please try again later."}), 503
         
         # Run virtual try-on
         result = tryon_client.predict(
@@ -355,4 +726,4 @@ def get_user_history(user_id):
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+    app.run(debug=True, host='0.0.0.0', port=5000)
