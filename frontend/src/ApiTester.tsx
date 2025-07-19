@@ -56,8 +56,8 @@ export default function ApiTester() {
   };
 
   const testHealth = () => testEndpoint("/health");
-  const testPresetGarments = () => testEndpoint("/preset-garments");
-  const testUserHistory = () => testEndpoint("/user-history/test_user_123");
+  const testPresetGarments = () => testEndpoint("/api/preset-garments");
+  const testUserHistory = () => testEndpoint("/api/user-history/test_user_123");
 
   const testUploadGarment = () => {
     // Create a simple test image (1x1 pixel)
@@ -76,12 +76,12 @@ export default function ApiTester() {
         formData.append("garment_image", blob, "test_garment.png");
         formData.append("user_id", "test_user_123");
         formData.append("description", "Test garment from API tester");
-        testEndpoint("/upload-garment", "POST", formData);
+        testEndpoint("/api/upload-garment", "POST", formData);
       }
     });
   };
 
-  const testProcessVideo = () => {
+  const testBodyDetection = () => {
     // Create a simple test video (1x1 pixel, 1 frame)
     const canvas = document.createElement("canvas");
     canvas.width = 1;
@@ -115,7 +115,7 @@ export default function ApiTester() {
         const formData = new FormData();
         const fileExtension = mimeType.includes("webm") ? "webm" : "mp4";
         formData.append("video_file", blob, `test_video.${fileExtension}`);
-        testEndpoint("/process-video", "POST", formData);
+        testEndpoint("/api/detect-body", "POST", formData);
       }
     }, mimeType);
   };
@@ -126,7 +126,7 @@ export default function ApiTester() {
       garment_id: "blue_shirt",
       user_id: "test_user_123",
     };
-    testEndpoint("/tryon", "POST", data);
+    testEndpoint("/api/tryon", "POST", data);
   };
 
   return (
@@ -161,15 +161,15 @@ export default function ApiTester() {
           </h3>
           <button
             onClick={testPresetGarments}
-            disabled={loading === "/preset-garments"}
+            disabled={loading === "/api/preset-garments"}
             className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors duration-200 mb-4"
           >
-            {loading === "/preset-garments"
+            {loading === "/api/preset-garments"
               ? "Testing..."
-              : "Test /preset-garments"}
+              : "Test /api/preset-garments"}
           </button>
           <pre className="bg-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto">
-            {JSON.stringify(responses["/preset-garments"], null, 2)}
+            {JSON.stringify(responses["/api/preset-garments"], null, 2)}
           </pre>
         </div>
 
@@ -179,33 +179,33 @@ export default function ApiTester() {
           </h3>
           <button
             onClick={testUploadGarment}
-            disabled={loading === "/upload-garment"}
+            disabled={loading === "/api/upload-garment"}
             className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors duration-200 mb-4"
           >
-            {loading === "/upload-garment"
+            {loading === "/api/upload-garment"
               ? "Testing..."
-              : "Test /upload-garment"}
+              : "Test /api/upload-garment"}
           </button>
           <pre className="bg-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto">
-            {JSON.stringify(responses["/upload-garment"], null, 2)}
+            {JSON.stringify(responses["/api/upload-garment"], null, 2)}
           </pre>
         </div>
 
         <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Process Video
+            Body Detection
           </h3>
           <button
-            onClick={testProcessVideo}
-            disabled={loading === "/process-video"}
+            onClick={testBodyDetection}
+            disabled={loading === "/api/detect-body"}
             className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors duration-200 mb-4"
           >
-            {loading === "/process-video"
+            {loading === "/api/detect-body"
               ? "Testing..."
-              : "Test /process-video"}
+              : "Test /api/detect-body"}
           </button>
           <pre className="bg-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto">
-            {JSON.stringify(responses["/process-video"], null, 2)}
+            {JSON.stringify(responses["/api/detect-body"], null, 2)}
           </pre>
         </div>
 
@@ -215,13 +215,13 @@ export default function ApiTester() {
           </h3>
           <button
             onClick={testTryOn}
-            disabled={loading === "/tryon"}
+            disabled={loading === "/api/tryon"}
             className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors duration-200 mb-4"
           >
-            {loading === "/tryon" ? "Testing..." : "Test /tryon"}
+            {loading === "/api/tryon" ? "Testing..." : "Test /api/tryon"}
           </button>
           <pre className="bg-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto">
-            {JSON.stringify(responses["/tryon"], null, 2)}
+            {JSON.stringify(responses["/api/tryon"], null, 2)}
           </pre>
         </div>
 
@@ -231,15 +231,19 @@ export default function ApiTester() {
           </h3>
           <button
             onClick={testUserHistory}
-            disabled={loading === "/user-history/test_user_123"}
+            disabled={loading === "/api/user-history/test_user_123"}
             className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors duration-200 mb-4"
           >
-            {loading === "/user-history/test_user_123"
+            {loading === "/api/user-history/test_user_123"
               ? "Testing..."
-              : "Test /user-history"}
+              : "Test /api/user-history"}
           </button>
           <pre className="bg-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto">
-            {JSON.stringify(responses["/user-history/test_user_123"], null, 2)}
+            {JSON.stringify(
+              responses["/api/user-history/test_user_123"],
+              null,
+              2
+            )}
           </pre>
         </div>
       </div>

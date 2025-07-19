@@ -23,6 +23,41 @@ interface TryOnResult {
   message: string;
 }
 
+interface BodyDetectionResult {
+  success: boolean;
+  best_frame?: string; // base64 data URL from OpenCV
+  confidence?: number;
+  frame_number?: number;
+  detection_mode?: string;
+  annotations?: {
+    faces: Array<{
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      area_ratio?: number;
+    }>;
+    bodies: Array<{
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      area_ratio?: number;
+    }>;
+    detection_quality?: {
+      face_confidence: number;
+      body_confidence: number;
+      quality_score: number;
+      brightness_confidence: number;
+      contrast_confidence: number;
+      total_confidence: number;
+      brightness: number;
+      contrast: number;
+    };
+  };
+  message: string;
+}
+
 function App() {
   const [currentStep, setCurrentStep] = useState(1);
   const [garments, setGarments] = useState<Garment[]>([]);
@@ -31,14 +66,22 @@ function App() {
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState<string>("");
+  const [bodyDetectionResult, setBodyDetectionResult] =
+    useState<BodyDetectionResult | null>(null);
   const [tryOnResult, setTryOnResult] = useState<TryOnResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [recordingDuration, setRecordingDuration] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mimeTypeRef = useRef<string>("");
+  const durationIntervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    console.log("recording duration", recordingDuration);
+  }, [recordingDuration]);
 
   const API_BASE = "http://127.0.0.1:5000";
 
@@ -64,7 +107,7 @@ function App() {
 
   const fetchPresetGarments = async () => {
     try {
-      const response = await fetch(`${API_BASE}/preset-garments`);
+      const response = await fetch(`${API_BASE}/api/preset-garments`);
       const data = await response.json();
       if (data.success) {
         setGarments(data.garments);
@@ -82,7 +125,7 @@ function App() {
     formData.append("description", "Custom uploaded garment");
 
     try {
-      const response = await fetch(`${API_BASE}/upload-garment`, {
+      const response = await fetch(`${API_BASE}/api/upload-garment`, {
         method: "POST",
         body: formData,
       });
@@ -115,12 +158,12 @@ function App() {
       }
 
       // Check for supported video formats in order of preference
+      // Browsers typically support WebM better than MP4 for recording
       const supportedFormats = [
-        "video/mp4;codecs=h264",
-        "video/webm;codecs=h264",
         "video/webm;codecs=vp9",
         "video/webm;codecs=vp8",
         "video/webm",
+        "video/mp4;codecs=h264",
         "video/mp4",
       ];
 
@@ -149,25 +192,43 @@ function App() {
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: mimeType,
+        videoBitsPerSecond: 2500000, // 2.5 Mbps for better quality
       });
 
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunks.push(event.data);
+          console.log(`Received chunk: ${event.data.size} bytes`);
         }
       };
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunks, { type: mimeType });
+        console.log(
+          `Recording complete: ${blob.size} bytes, type: ${blob.type}`
+        );
         setVideoBlob(blob);
         // Stay on step 2 to show the video preview
       };
 
       mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start();
+      mediaRecorder.start(1000); // Collect data every second for better reliability
       setIsRecording(true);
+
+      const startTime = Date.now();
+      setRecordingDuration(0);
       setError("");
+
+      // Start duration timer
+      const durationInterval = setInterval(() => {
+        const duration = Math.floor((Date.now() - startTime) / 1000);
+        setRecordingDuration(duration);
+        console.log(`Recording duration: ${duration}s`);
+      }, 1000);
+
+      // Store interval ID for cleanup
+      durationIntervalRef.current = durationInterval;
     } catch (err) {
       console.error("Error starting video recording:", err);
       setError(
@@ -177,9 +238,17 @@ function App() {
   };
 
   const stopVideoRecording = () => {
+    console.log("stopping video recording");
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      // setRecordingDuration(0);
+
+      // Clear duration interval
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
 
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -193,37 +262,66 @@ function App() {
       return;
     }
 
-    console.log("videoBlob", videoBlob);
+    // Validate minimum recording duration
+    if (recordingDuration < 4) {
+      setError(
+        "Video must be at least 4 seconds long for processing. Please record a longer video."
+      );
+      return;
+    }
+
+    console.log("Processing video blob:", {
+      size: videoBlob.size,
+      type: videoBlob.type,
+      mimeType: mimeTypeRef.current,
+      duration: recordingDuration,
+    });
+
     setLoading(true);
     setError("");
     setCurrentStep(3); // Move to processing step
 
     try {
-      console.log("processing video");
-      const formData = new FormData();
-      // Determine file extension based on the actual MIME type used
-      let fileExtension = "mp4"; // default
-      if (mimeTypeRef.current.includes("webm")) {
-        fileExtension = "webm";
-      } else if (mimeTypeRef.current.includes("mp4")) {
-        fileExtension = "mp4";
-      }
-      formData.append("video_file", videoBlob, `recording.${fileExtension}`);
+      console.log("Uploading video for OpenCV body detection");
 
-      const response = await fetch(`${API_BASE}/process-video`, {
+      // Step 1: Upload video for OpenCV body detection
+      const uploadFormData = new FormData();
+
+      // Determine file extension based on the actual MIME type used
+      let fileExtension = "webm"; // default to webm since browsers prefer it
+      if (mimeTypeRef.current.includes("mp4")) {
+        fileExtension = "mp4";
+      } else if (mimeTypeRef.current.includes("webm")) {
+        fileExtension = "webm";
+      }
+
+      console.log(
+        `Using file extension: ${fileExtension} for MIME type: ${mimeTypeRef.current}`
+      );
+
+      uploadFormData.append(
+        "video_file",
+        videoBlob,
+        `recording.${fileExtension}`
+      );
+
+      // Step 2: Process video with OpenCV body detection
+      console.log("Processing video with OpenCV body detection");
+      const processResponse = await fetch(`${API_BASE}/api/detect-body`, {
         method: "POST",
-        body: formData,
+        body: uploadFormData,
       });
 
-      const data = await response.json();
-      if (data.success) {
-        // For testing, we'll simulate a frame selection
-        setSelectedFrame(
-          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
-        );
+      const processData: BodyDetectionResult = await processResponse.json();
+      if (processData.success && processData.best_frame) {
+        setSelectedFrame(processData.best_frame);
+        setBodyDetectionResult(processData);
         setCurrentStep(4);
+        console.log(
+          `Body detection successful with confidence: ${processData.confidence}`
+        );
       } else {
-        setError(data.error || "Failed to process video");
+        setError(processData.message || "Failed to detect body in video");
       }
     } catch (err) {
       console.error("Error processing video:", err);
@@ -240,12 +338,25 @@ function App() {
     setError("");
 
     try {
+      // Convert base64 data URL to a file for upload
+      const base64Data = selectedFrame.replace(
+        /^data:image\/[a-z]+;base64,/,
+        ""
+      );
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "image/jpeg" });
+
       const formData = new FormData();
-      formData.append("person_image_path", selectedFrame);
+      formData.append("person_image", blob, "detected_frame.jpg");
       formData.append("garment_id", selectedGarment);
       formData.append("user_id", "test_user_123");
 
-      const response = await fetch(`${API_BASE}/tryon`, {
+      const response = await fetch(`${API_BASE}/api/tryon`, {
         method: "POST",
         body: formData,
       });
@@ -279,6 +390,7 @@ function App() {
     setCustomGarment(null);
     setVideoBlob(null);
     setSelectedFrame("");
+    setBodyDetectionResult(null);
     setTryOnResult(null);
     setError("");
     setLoading(false);
@@ -292,7 +404,7 @@ function App() {
           🎽 Virtual Try-On App
         </h1>
         <p className="text-lg text-white/90">
-          AI-Powered Clothing Try-On with Video Processing
+          AI-Powered Clothing Try-On with OpenCV Body Detection
         </p>
       </header>
 
@@ -310,7 +422,7 @@ function App() {
             >
               {step === 1 && "1. Garment Selection"}
               {step === 2 && "2. Video Recording"}
-              {step === 3 && "3. Frame Analysis"}
+              {step === 3 && "3. Body Detection"}
               {step === 4 && "4. Try-On"}
               {step === 5 && "5. Results"}
             </div>
@@ -413,8 +525,8 @@ function App() {
               Step 2: Record Video
             </h2>
             <p className="text-gray-600 text-center mb-8">
-              Record a short video of yourself standing still. The AI will find
-              the best frame for try-on.
+              Record a short video of yourself standing still. OpenCV will
+              detect your body pose and find the best frame for try-on.
             </p>
 
             <div className="text-center mb-8">
@@ -435,12 +547,21 @@ function App() {
                     🎥 Start Recording
                   </button>
                 ) : (
-                  <button
-                    className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105"
-                    onClick={stopVideoRecording}
-                  >
-                    ⏹️ Stop Recording
-                  </button>
+                  <div className="space-y-2">
+                    <div className="text-lg font-semibold text-gray-700">
+                      Recording: {recordingDuration}s
+                    </div>
+                    <button
+                      className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105"
+                      onClick={stopVideoRecording}
+                      disabled={recordingDuration < 4}
+                    >
+                      ⏹️ Stop Recording{" "}
+                      {recordingDuration < 4
+                        ? `(${4 - recordingDuration}s left)`
+                        : ""}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -460,27 +581,31 @@ function App() {
                   onClick={processVideo}
                   disabled={loading}
                 >
-                  {loading ? "Processing..." : "Next: Analyze Video"}
+                  {loading ? "Processing..." : "Next: Detect Body Pose"}
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* Step 3: Frame Analysis */}
+        {/* Step 3: Body Detection */}
         {currentStep === 3 && (
           <div className="bg-white rounded-2xl p-8 shadow-2xl mb-8">
             <h2 className="text-3xl font-bold text-gray-800 text-center mb-4">
-              Step 3: Video Analysis
+              Step 3: Body Detection
             </h2>
             <p className="text-gray-600 text-center mb-8">
-              AI is analyzing your video to find the best frame for try-on...
+              OpenCV is analyzing your video to detect body pose and find the
+              best frame for try-on...
             </p>
 
             <div className="text-center py-12">
               <div className="w-12 h-12 border-4 border-gray-300 border-t-green-500 rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-gray-600">
-                Processing video with TwelveLabs...
+                Detecting body pose with OpenCV...
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                Looking for frames where all body keypoints are visible
               </p>
             </div>
           </div>
@@ -493,18 +618,19 @@ function App() {
               Step 4: Virtual Try-On
             </h2>
             <p className="text-gray-600 text-center mb-8">
-              Selected frame and garment ready for try-on
+              Selected frame with detected body pose and garment ready for
+              try-on
             </p>
 
-            <div className="grid md:grid-cols-2 gap-8 mb-8">
+            <div className="grid lg:grid-cols-3 gap-8 mb-8">
               <div className="text-center bg-gray-50 rounded-xl p-6">
                 <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                  Selected Frame
+                  Detected Body Frame
                 </h3>
                 {selectedFrame && (
                   <img
                     src={selectedFrame}
-                    alt="Selected frame"
+                    alt="Selected frame with body detection"
                     className="w-full max-w-xs h-96 object-cover rounded-lg border-2 border-gray-200 mx-auto"
                   />
                 )}
@@ -525,6 +651,154 @@ function App() {
                       className="w-full max-w-xs h-96 object-cover rounded-lg border-2 border-gray-200 mx-auto"
                     />
                   )}
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-6">
+                <h3 className="text-xl font-semibold text-gray-700 mb-4 text-center">
+                  Detection Results
+                </h3>
+                {bodyDetectionResult && (
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 border-l-4 border-green-500">
+                      <h4 className="font-semibold text-gray-800 mb-2">
+                        Overall Confidence
+                      </h4>
+                      <div className="text-2xl font-bold text-green-600">
+                        {(bodyDetectionResult.confidence! * 100).toFixed(1)}%
+                      </div>
+                      {bodyDetectionResult.detection_mode && (
+                        <div className="text-sm text-gray-600 mt-2">
+                          Detection Mode:{" "}
+                          <span className="font-medium">
+                            {bodyDetectionResult.detection_mode}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {bodyDetectionResult.annotations && (
+                      <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500">
+                        <h4 className="font-semibold text-gray-800 mb-2">
+                          Detection Breakdown
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Face Detection:</span>
+                            <span className="font-medium">
+                              {(
+                                (bodyDetectionResult.annotations
+                                  .detection_quality?.face_confidence || 0) *
+                                100
+                              ).toFixed(1)}
+                              %
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Body Detection:</span>
+                            <span className="font-medium">
+                              {(
+                                (bodyDetectionResult.annotations
+                                  .detection_quality?.body_confidence || 0) *
+                                100
+                              ).toFixed(1)}
+                              %
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Quality Score:</span>
+                            <span className="font-medium">
+                              {(
+                                (bodyDetectionResult.annotations
+                                  .detection_quality?.quality_score || 0) * 100
+                              ).toFixed(1)}
+                              %
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Image Quality:</span>
+                            <span className="font-medium">
+                              {(
+                                (bodyDetectionResult.annotations
+                                  .detection_quality?.brightness_confidence ||
+                                  0) +
+                                (bodyDetectionResult.annotations
+                                  .detection_quality?.contrast_confidence || 0)
+                              ).toFixed(1)}
+                              %
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-white rounded-lg p-4 border-l-4 border-purple-500">
+                      <h4 className="font-semibold text-gray-800 mb-2">
+                        Detected Objects
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Faces:</span>
+                          <span className="font-medium text-green-600">
+                            {bodyDetectionResult.annotations?.faces.length || 0}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Bodies:</span>
+                          <span className="font-medium text-blue-600">
+                            {bodyDetectionResult.annotations?.bodies.length ||
+                              0}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Frame #:</span>
+                          <span className="font-medium">
+                            {bodyDetectionResult.frame_number || "N/A"}
+                          </span>
+                        </div>
+                        {bodyDetectionResult.annotations?.detection_quality && (
+                          <>
+                            <div className="flex justify-between">
+                              <span>Brightness:</span>
+                              <span className="font-medium">
+                                {bodyDetectionResult.annotations.detection_quality.brightness?.toFixed(
+                                  0
+                                ) || "N/A"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Contrast:</span>
+                              <span className="font-medium">
+                                {bodyDetectionResult.annotations.detection_quality.contrast?.toFixed(
+                                  0
+                                ) || "N/A"}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border-l-4 border-orange-500">
+                      <h4 className="font-semibold text-gray-800 mb-2">
+                        Legend
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                          <span>Green: Face Detection</span>
+                        </div>
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                          <span>Blue: Body Detection</span>
+                        </div>
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 bg-white border border-gray-300 rounded mr-2"></div>
+                          <span>White: Confidence Score</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -603,7 +877,7 @@ function App() {
       {/* Footer */}
       <footer className="text-center py-8 px-4 bg-black/10 backdrop-blur-md mt-8">
         <p className="text-white/80">
-          Built for Hack the 6ix 2025 | Powered by AI
+          Built for Hack the 6ix 2025 | Powered by AI & OpenCV
         </p>
       </footer>
 
