@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import ApiTester from "./ApiTester";
+import RealtimeStreaming from "./components/RealtimeStreaming";
+import type { AnnotatedFrameData } from "./services/streamingService";
 
 interface Garment {
   id: string;
@@ -73,6 +75,11 @@ function App() {
   const [error, setError] = useState<string>("");
   const [recordingDuration, setRecordingDuration] = useState(0);
 
+  // New state for real-time streaming
+  const [useRealtimeStreaming, setUseRealtimeStreaming] = useState(true);
+  const [realtimeDetectionData, setRealtimeDetectionData] =
+    useState<AnnotatedFrameData | null>(null);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -140,6 +147,21 @@ function App() {
       console.error("Error uploading garment:", err);
       setError("Failed to upload garment");
     }
+  };
+
+  // New handler for real-time frame selection
+  const handleFrameSelected = (
+    frameData: string,
+    detectionData: AnnotatedFrameData
+  ) => {
+    setSelectedFrame(frameData);
+    setRealtimeDetectionData(detectionData);
+    setCurrentStep(4); // Move directly to try-on step
+  };
+
+  // New handler for real-time streaming errors
+  const handleStreamingError = (errorMsg: string) => {
+    setError(errorMsg);
   };
 
   const startVideoRecording = async () => {
@@ -394,6 +416,7 @@ function App() {
     setTryOnResult(null);
     setError("");
     setLoading(false);
+    setRealtimeDetectionData(null);
   };
 
   return (
@@ -404,7 +427,7 @@ function App() {
           🎽 Virtual Try-On App
         </h1>
         <p className="text-lg text-white/90">
-          AI-Powered Clothing Try-On with OpenCV Body Detection
+          AI-Powered Clothing Try-On with Real-Time OpenCV Body Detection
         </p>
       </header>
 
@@ -421,8 +444,8 @@ function App() {
               }`}
             >
               {step === 1 && "1. Garment Selection"}
-              {step === 2 && "2. Video Recording"}
-              {step === 3 && "3. Body Detection"}
+              {step === 2 && "2. Body Detection"}
+              {step === 3 && "3. Processing"}
               {step === 4 && "4. Try-On"}
               {step === 5 && "5. Results"}
             </div>
@@ -512,83 +535,138 @@ function App() {
                 onClick={() => setCurrentStep(2)}
                 disabled={!selectedGarment}
               >
-                Next: Start Video Recording
+                Next: Body Detection
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 2: Video Recording */}
+        {/* Step 2: Body Detection (Real-time or Recording) */}
         {currentStep === 2 && (
-          <div className="bg-white rounded-2xl p-8 shadow-2xl mb-8">
-            <h2 className="text-3xl font-bold text-gray-800 text-center mb-4">
-              Step 2: Record Video
-            </h2>
-            <p className="text-gray-600 text-center mb-8">
-              Record a short video of yourself standing still. OpenCV will
-              detect your body pose and find the best frame for try-on.
-            </p>
-
-            <div className="text-center mb-8">
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                className="w-full max-w-2xl h-96 bg-black rounded-2xl mx-auto mb-4"
-              />
-
-              <div className="space-x-4">
-                {!isRecording ? (
-                  <button
-                    className="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105"
-                    onClick={startVideoRecording}
-                  >
-                    🎥 Start Recording
-                  </button>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="text-lg font-semibold text-gray-700">
-                      Recording: {recordingDuration}s
-                    </div>
-                    <button
-                      className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105"
-                      onClick={stopVideoRecording}
-                      disabled={recordingDuration < 4}
-                    >
-                      ⏹️ Stop Recording{" "}
-                      {recordingDuration < 4
-                        ? `(${4 - recordingDuration}s left)`
-                        : ""}
-                    </button>
-                  </div>
-                )}
+          <div className="mb-8">
+            {/* Detection Mode Selection */}
+            <div className="bg-white rounded-2xl p-6 shadow-2xl mb-6">
+              <h3 className="text-xl font-semibold text-gray-700 mb-4 text-center">
+                Choose Detection Mode
+              </h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <button
+                  className={`p-6 rounded-xl border-2 transition-all duration-300 ${
+                    useRealtimeStreaming
+                      ? "border-green-500 bg-green-50 shadow-lg"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                  onClick={() => setUseRealtimeStreaming(true)}
+                >
+                  <div className="text-2xl mb-2">🎥</div>
+                  <h4 className="font-semibold text-gray-800 mb-2">
+                    Real-Time Detection
+                  </h4>
+                  <p className="text-sm text-gray-600">
+                    Live camera feed with instant body detection and pose
+                    estimation
+                  </p>
+                </button>
+                <button
+                  className={`p-6 rounded-xl border-2 transition-all duration-300 ${
+                    !useRealtimeStreaming
+                      ? "border-green-500 bg-green-50 shadow-lg"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                  onClick={() => setUseRealtimeStreaming(false)}
+                >
+                  <div className="text-2xl mb-2">📹</div>
+                  <h4 className="font-semibold text-gray-800 mb-2">
+                    Video Recording
+                  </h4>
+                  <p className="text-sm text-gray-600">
+                    Record a video and find the best frame for body detection
+                  </p>
+                </button>
               </div>
             </div>
 
-            {videoBlob && (
-              <div className="text-center">
-                <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                  Recorded Video
-                </h3>
-                <video
-                  src={URL.createObjectURL(videoBlob)}
-                  controls
-                  className="w-full max-w-2xl rounded-2xl mx-auto mb-4"
-                />
-                <button
-                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 disabled:cursor-not-allowed"
-                  onClick={processVideo}
-                  disabled={loading}
-                >
-                  {loading ? "Processing..." : "Next: Detect Body Pose"}
-                </button>
+            {/* Real-time Streaming Component */}
+            {useRealtimeStreaming && (
+              <RealtimeStreaming
+                onFrameSelected={handleFrameSelected}
+                onError={handleStreamingError}
+              />
+            )}
+
+            {/* Legacy Video Recording */}
+            {!useRealtimeStreaming && (
+              <div className="bg-white rounded-2xl p-8 shadow-2xl mb-8">
+                <h2 className="text-3xl font-bold text-gray-800 text-center mb-4">
+                  Step 2: Record Video
+                </h2>
+                <p className="text-gray-600 text-center mb-8">
+                  Record a short video of yourself standing still. OpenCV will
+                  detect your body pose and find the best frame for try-on.
+                </p>
+
+                <div className="text-center mb-8">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full max-w-2xl h-96 bg-black rounded-2xl mx-auto mb-4"
+                  />
+
+                  <div className="space-x-4">
+                    {!isRecording ? (
+                      <button
+                        className="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105"
+                        onClick={startVideoRecording}
+                      >
+                        🎥 Start Recording
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="text-lg font-semibold text-gray-700">
+                          Recording: {recordingDuration}s
+                        </div>
+                        <button
+                          className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105"
+                          onClick={stopVideoRecording}
+                          disabled={recordingDuration < 4}
+                        >
+                          ⏹️ Stop Recording{" "}
+                          {recordingDuration < 4
+                            ? `(${4 - recordingDuration}s left)`
+                            : ""}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {videoBlob && (
+                  <div className="text-center">
+                    <h3 className="text-xl font-semibold text-gray-700 mb-4">
+                      Recorded Video
+                    </h3>
+                    <video
+                      src={URL.createObjectURL(videoBlob)}
+                      controls
+                      className="w-full max-w-2xl rounded-2xl mx-auto mb-4"
+                    />
+                    <button
+                      className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white font-semibold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 disabled:cursor-not-allowed"
+                      onClick={processVideo}
+                      disabled={loading}
+                    >
+                      {loading ? "Processing..." : "Next: Detect Body Pose"}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* Step 3: Body Detection */}
+        {/* Step 3: Body Detection Processing (Legacy) */}
         {currentStep === 3 && (
           <div className="bg-white rounded-2xl p-8 shadow-2xl mb-8">
             <h2 className="text-3xl font-bold text-gray-800 text-center mb-4">
@@ -657,7 +735,58 @@ function App() {
                 <h3 className="text-xl font-semibold text-gray-700 mb-4 text-center">
                   Detection Results
                 </h3>
-                {bodyDetectionResult && (
+                {realtimeDetectionData ? (
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-4 border-l-4 border-green-500">
+                      <h4 className="font-semibold text-gray-800 mb-2">
+                        Real-Time Confidence
+                      </h4>
+                      <div className="text-2xl font-bold text-green-600">
+                        {(realtimeDetectionData.confidence * 100).toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-gray-600 mt-2">
+                        Detection Mode: Real-time
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border-l-4 border-blue-500">
+                      <h4 className="font-semibold text-gray-800 mb-2">
+                        Detection Breakdown
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Faces:</span>
+                          <span className="font-medium">
+                            {realtimeDetectionData.detection_quality.face_count}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Bodies:</span>
+                          <span className="font-medium">
+                            {realtimeDetectionData.detection_quality.body_count}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Landmarks:</span>
+                          <span className="font-medium">
+                            {
+                              realtimeDetectionData.detection_quality
+                                .landmark_count
+                            }
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Brightness:</span>
+                          <span className="font-medium">
+                            {realtimeDetectionData.detection_quality.brightness.toFixed(
+                              0
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : bodyDetectionResult ? (
                   <div className="space-y-4">
                     <div className="bg-white rounded-lg p-4 border-l-4 border-green-500">
                       <h4 className="font-semibold text-gray-800 mb-2">
@@ -798,7 +927,7 @@ function App() {
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
