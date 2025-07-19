@@ -115,51 +115,6 @@ def get_full_video_metadata(file_path: str) -> dict:
 
     return json.loads(result.stdout)
 
-def get_video_duration(video_path):
-    """Get video duration in seconds using ffprobe"""
-    try:
-        metadata = get_full_video_metadata(video_path)
-        
-        # Try to get duration from format first (works well with MP4)
-        if 'format' in metadata and 'duration' in metadata['format']:
-            duration = float(metadata['format']['duration'])
-            print(f"Duration from format metadata: {duration} seconds")
-            return duration
-        
-        # For video files, try to get duration from video stream
-        if 'streams' in metadata and len(metadata['streams']) > 0:
-            # Find the video stream
-            video_stream = next((s for s in metadata['streams'] if s.get('codec_type') == 'video'), None)
-            
-            if video_stream:
-                # Try to get duration from stream duration
-                if 'duration' in video_stream:
-                    duration = float(video_stream['duration'])
-                    print(f"Duration from video stream: {duration} seconds")
-                    return duration
-                
-                # Try to get duration from tags
-                if 'tags' in video_stream and 'DURATION' in video_stream['tags']:
-                    duration_str = video_stream['tags']['DURATION']
-                    try:
-                        import re
-                        match = re.match(r'(\d+):(\d+):(\d+\.\d+)', duration_str)
-                        if match:
-                            hours, minutes, seconds = match.groups()
-                            duration = float(hours) * 3600 + float(minutes) * 60 + float(seconds)
-                            print(f"Duration from stream tags: {duration} seconds")
-                            return duration
-                    except:
-                        pass
-        
-        # If we can't get exact duration, raise an error
-        raise ValueError("Could not determine exact video duration from metadata")
-        
-    except FileNotFoundError:
-        raise FileNotFoundError("ffprobe not found. Please install ffmpeg.")
-    except Exception as e:
-        raise Exception(f"Error getting video duration: {e}")
-
 def get_video_info(video_path):
     """Get comprehensive video information for debugging"""
     try:
