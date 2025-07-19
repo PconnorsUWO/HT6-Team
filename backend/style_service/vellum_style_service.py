@@ -13,17 +13,8 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
-# Handle import conflict with local vellum directory
-# We need to import from the vellum-ai package, not our local vellum folder
+# Import from the vellum-ai package
 try:
-    # Remove our local vellum directory from sys.modules if it was imported
-    if 'vellum' in sys.modules and hasattr(sys.modules['vellum'], '__file__'):
-        local_vellum_path = os.path.dirname(os.path.abspath(__file__))
-        if sys.modules['vellum'].__file__ and local_vellum_path in sys.modules['vellum'].__file__:
-            del sys.modules['vellum']
-    
-    # Import from the actual vellum-ai package
-    import vellum
     from vellum import Vellum
     import vellum.types as types
     VELLUM_AVAILABLE = True
