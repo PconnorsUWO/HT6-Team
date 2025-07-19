@@ -3,7 +3,7 @@ import json
 import os
 
 # API base URL
-BASE_URL = "http://localhost:3000"
+BASE_URL = "http://localhost:5000"
 
 def test_health_check():
     """Test health check endpoint"""
@@ -16,8 +16,8 @@ def test_health_check():
         else:
             print(f"Error response: {response.text}")
     except requests.exceptions.ConnectionError:
-        print("Connection failed. Make sure the Flask server is running on port 3000")
-        print("   Run: uv run -- flask run -p 3000")
+        print("Connection failed. Make sure the Flask server is running on port 5000")
+        print("   Run: uv run -- flask run -p 5000")
     except json.JSONDecodeError:
         print(f"Invalid JSON response: {response.text}")
     except Exception as e:
@@ -35,7 +35,7 @@ def test_preset_garments():
         else:
             print(f"Error response: {response.text}")
     except requests.exceptions.ConnectionError:
-        print("Connection failed. Make sure the Flask server is running on port 3000")
+        print("Connection failed. Make sure the Flask server is running on port 5000")
     except json.JSONDecodeError:
         print(f"Invalid JSON response: {response.text}")
     except Exception as e:
@@ -66,7 +66,7 @@ def test_upload_garment():
         else:
             print(f"Error response: {response.text}")
     except requests.exceptions.ConnectionError:
-        print("Connection failed. Make sure the Flask server is running on port 3000")
+        print("Connection failed. Make sure the Flask server is running on port 5000")
     except json.JSONDecodeError:
         print(f"Invalid JSON response: {response.text}")
     except Exception as e:
@@ -102,7 +102,7 @@ def test_virtual_tryon():
         else:
             print(f"Error response: {response.text}")
     except requests.exceptions.ConnectionError:
-        print("Connection failed. Make sure the Flask server is running on port 3000")
+        print("Connection failed. Make sure the Flask server is running on port 5000")
     except json.JSONDecodeError:
         print(f"Invalid JSON response: {response.text}")
     except Exception as e:
@@ -121,7 +121,7 @@ def test_user_history():
         else:
             print(f"Error response: {response.text}")
     except requests.exceptions.ConnectionError:
-        print("Connection failed. Make sure the Flask server is running on port 3000")
+        print("Connection failed. Make sure the Flask server is running on port 5000")
     except json.JSONDecodeError:
         print(f"Invalid JSON response: {response.text}")
     except Exception as e:
@@ -149,7 +149,7 @@ def test_api_endpoints():
     print("✅ Virtual try-on endpoint")
     print("✅ User history endpoint")
     print()
-    print("💡 To start the server: uv run -- flask run -p 3000")
+    print("💡 To start the server: uv run -- flask run -p 5000")
 
 if __name__ == "__main__":
     test_api_endpoints() 

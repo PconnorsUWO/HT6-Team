@@ -13,7 +13,7 @@ export default function ApiTester() {
   );
   const [loading, setLoading] = useState<string | null>(null);
 
-  const API_BASE = "http://localhost:3001";
+  const API_BASE = "http://127.0.0.1:5000";
 
   const testEndpoint = async (
     endpoint: string,
@@ -92,13 +92,32 @@ export default function ApiTester() {
       ctx.fillRect(0, 0, 1, 1);
     }
 
+    // Check for supported video format
+    const supportedFormats = [
+      "video/mp4;codecs=h264",
+      "video/webm;codecs=h264",
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm",
+      "video/mp4",
+    ];
+
+    let mimeType = "video/webm"; // fallback
+    for (const format of supportedFormats) {
+      if (MediaRecorder.isTypeSupported(format)) {
+        mimeType = format;
+        break;
+      }
+    }
+
     canvas.toBlob((blob) => {
       if (blob) {
         const formData = new FormData();
-        formData.append("video_file", blob, "test_video.webm");
+        const fileExtension = mimeType.includes("webm") ? "webm" : "mp4";
+        formData.append("video_file", blob, `test_video.${fileExtension}`);
         testEndpoint("/process-video", "POST", formData);
       }
-    }, "video/webm");
+    }, mimeType);
   };
 
   const testTryOn = () => {

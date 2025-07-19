@@ -38,13 +38,29 @@ function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mimeTypeRef = useRef<string>("");
 
-  const API_BASE = "http://127.0.0.1:3001";
+  const API_BASE = "http://127.0.0.1:5000";
 
   // Load preset garments on component mount
   useEffect(() => {
+    // First test if backend is accessible
+    testBackendConnection();
     fetchPresetGarments();
   }, []);
+
+  const testBackendConnection = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/test`);
+      const data = await response.json();
+      console.log("✅ Backend connection test:", data);
+    } catch (err) {
+      console.error("❌ Backend connection failed:", err);
+      setError(
+        "Cannot connect to backend server. Please ensure the backend is running on http://127.0.0.1:5000"
+      );
+    }
+  };
 
   const fetchPresetGarments = async () => {
     try {
@@ -98,8 +114,41 @@ function App() {
         videoRef.current.srcObject = stream;
       }
 
+      // Check for supported video formats in order of preference
+      const supportedFormats = [
+        "video/mp4;codecs=h264",
+        "video/webm;codecs=h264",
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm",
+        "video/mp4",
+      ];
+
+      let mimeType = "";
+      for (const format of supportedFormats) {
+        if (MediaRecorder.isTypeSupported(format)) {
+          mimeType = format;
+          break;
+        }
+      }
+
+      if (!mimeType) {
+        throw new Error("No supported video format found for recording");
+      }
+
+      console.log(`Using video format: ${mimeType}`);
+
+      // Store mimeType in a ref so it can be accessed in other functions
+      mimeTypeRef.current = mimeType;
+
+      // Log supported formats for debugging
+      console.log("Supported formats check:");
+      supportedFormats.forEach((format) => {
+        console.log(`${format}: ${MediaRecorder.isTypeSupported(format)}`);
+      });
+
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: "video/webm;codecs=vp9",
+        mimeType: mimeType,
       });
 
       const chunks: Blob[] = [];
@@ -110,9 +159,9 @@ function App() {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "video/webm" });
+        const blob = new Blob(chunks, { type: mimeType });
         setVideoBlob(blob);
-        setCurrentStep(3);
+        // Stay on step 2 to show the video preview
       };
 
       mediaRecorderRef.current = mediaRecorder;
@@ -139,14 +188,27 @@ function App() {
   };
 
   const processVideo = async () => {
-    if (!videoBlob) return;
+    if (!videoBlob) {
+      console.error("No video blob found");
+      return;
+    }
 
+    console.log("videoBlob", videoBlob);
     setLoading(true);
     setError("");
+    setCurrentStep(3); // Move to processing step
 
     try {
+      console.log("processing video");
       const formData = new FormData();
-      formData.append("video_file", videoBlob, "recording.webm");
+      // Determine file extension based on the actual MIME type used
+      let fileExtension = "mp4"; // default
+      if (mimeTypeRef.current.includes("webm")) {
+        fileExtension = "webm";
+      } else if (mimeTypeRef.current.includes("mp4")) {
+        fileExtension = "mp4";
+      }
+      formData.append("video_file", videoBlob, `recording.${fileExtension}`);
 
       const response = await fetch(`${API_BASE}/process-video`, {
         method: "POST",
@@ -261,6 +323,12 @@ function App() {
         <div className="max-w-2xl mx-auto mb-8 px-4">
           <div className="bg-red-500 text-white p-4 rounded-lg text-center shadow-lg">
             {error}
+            <button
+              onClick={testBackendConnection}
+              className="ml-4 bg-white text-red-500 px-3 py-1 rounded text-sm hover:bg-gray-100"
+            >
+              Test Connection
+            </button>
           </div>
         </div>
       )}
