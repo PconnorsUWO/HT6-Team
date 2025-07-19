@@ -2,10 +2,16 @@ from gradio_client import Client, file
 
 def main():
     client = Client("yisol/IDM-VTON")
+    
+    # Let's first check the API info to understand the correct structure
+    print("Available APIs:")
+    print(client.view_api())
+    
+    # Use the correct API structure based on the API info
     result = client.predict(
-            file('https://raw.githubusercontent.com/gradio-app/gradio/main/test/test_files/bus.png'),  # background image
-            file('https://raw.githubusercontent.com/gradio-app/gradio/main/test/test_files/bus.png'),  # garment image
-            "Hello!!",  # garment description
+            {"background": file('person.jpg'), "layers": [], "composite": None},  # dict parameter
+            file('garment.jpg'),  # garm_img
+            "Hello!!",  # garment_des
             True,  # is_checked
             False,  # is_checked_crop
             30,  # denoise_steps
