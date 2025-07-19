@@ -1,2 +1,19 @@
 backend/.env
 backend/uploads/*
+
+# IDE and editor files
+.vscode/
+.history/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.code-workspace
+
+# Temporary and log files
+*.tmp
+*.log
+*.bak
+*.swp
+
+# System files
+*.DS_Store
