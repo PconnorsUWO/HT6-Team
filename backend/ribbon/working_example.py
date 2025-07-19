@@ -1,16 +1,281 @@
 """
-Working Example with Existing Flows
+Working Example with Flow Creation and Management
 
 This example demonstrates how to:
-1. Work with existing interview flows 
-2. Create interviews
-3. Retrieve interview results
-
-Since the API plan has reached the flow creation limit, we'll use existing flows.
+1. Create various types of interview flows
+2. Work with existing interview flows 
+3. Create interviews
+4. Retrieve interview results
 """
 
-from ribbon_client import RibbonClient, InterviewConfig
+from ribbon_client import RibbonClient, InterviewConfig, InterviewFlow
 import time
+
+
+def create_sample_interview_flows():
+    """Create various types of interview flows for different use cases"""
+    client = RibbonClient()
+    
+    print("🎯 Creating Sample Interview Flows")
+    print("=" * 50)
+    
+    # Define different flow templates
+    flows_to_create = [
+        {
+            "org_name": "TechCorp Solutions",
+            "title": "Software Engineer Technical Interview",
+            "questions": [
+                "Tell me about yourself and your programming background.",
+                "Explain the difference between object-oriented and functional programming.",
+                "How would you design a scalable web application?",
+                "Describe a challenging bug you've encountered and how you solved it.",
+                "What are your favorite programming languages and why?",
+                "How do you stay updated with new technologies?",
+                "Tell me about a project you're particularly proud of."
+            ],
+            "interview_type": "recruitment",
+            "additional_info": "Technical screening for software engineering position"
+        },
+        {
+            "org_name": "Creative Agency Inc",
+            "title": "UX/UI Designer Portfolio Review",
+            "questions": [
+                "Walk me through your design background and experience.",
+                "Show me a project from your portfolio and explain your design process.",
+                "How do you approach user research and testing?",
+                "Describe a time when you had to defend a design decision.",
+                "What design tools do you prefer and why?",
+                "How do you handle feedback and iterate on designs?",
+                "Where do you find design inspiration?"
+            ],
+            "interview_type": "recruitment",
+            "additional_info": "Portfolio review and design process discussion"
+        },
+        {
+            "org_name": "StartupX",
+            "title": "Product Manager Behavioral Interview",
+            "questions": [
+                "Tell me about your product management experience.",
+                "Describe a product you launched from idea to market.",
+                "How do you prioritize features in a product roadmap?",
+                "Tell me about a time you had to make a difficult product decision.",
+                "How do you work with engineering and design teams?",
+                "Describe your approach to user feedback and data analysis.",
+                "What metrics do you use to measure product success?"
+            ],
+            "interview_type": "recruitment",
+            "additional_info": "Behavioral interview focusing on product management skills"
+        },
+        {
+            "org_name": "Research Institute",
+            "title": "Customer Feedback Collection",
+            "questions": [
+                "How would you rate your overall experience with our product?",
+                "What features do you find most valuable?",
+                "What challenges or pain points have you encountered?",
+                "How likely are you to recommend our product to others?",
+                "What improvements would you like to see?",
+                "How does our product compare to alternatives you've used?"
+            ],
+            "interview_type": "general",
+            "additional_info": "Customer satisfaction and feedback collection"
+        },
+        {
+            "org_name": "EduTech Academy",
+            "title": "Student Learning Assessment",
+            "questions": [
+                "What subjects are you most interested in learning?",
+                "How do you prefer to learn new concepts?",
+                "What learning challenges do you face?",
+                "Describe your ideal learning environment.",
+                "What motivates you to continue learning?",
+                "How do you measure your learning progress?"
+            ],
+            "interview_type": "general",
+            "additional_info": "Understanding student learning preferences and needs"
+        }
+    ]
+    
+    created_flows = []
+    
+    for flow_data in flows_to_create:
+        try:
+            print(f"\n🔧 Creating flow: {flow_data['title']}")
+            
+            # Create InterviewFlow object
+            flow = InterviewFlow(
+                org_name=flow_data['org_name'],
+                title=flow_data['title'],
+                questions=flow_data['questions'],
+                interview_type=flow_data['interview_type'],
+                additional_info=flow_data.get('additional_info')
+            )
+            
+            # Create the flow
+            result = client.create_interview_flows([flow])
+            flow_id = result.get('interview_flow_id')
+            
+            print(f"✅ Successfully created flow: {flow_id}")
+            print(f"   Organization: {flow_data['org_name']}")
+            print(f"   Type: {flow_data['interview_type']}")
+            print(f"   Questions: {len(flow_data['questions'])}")
+            
+            created_flows.append({
+                'flow_id': flow_id,
+                'title': flow_data['title'],
+                'org_name': flow_data['org_name'],
+                'type': flow_data['interview_type'],
+                'questions_count': len(flow_data['questions']),
+                'flow_object': flow
+            })
+            
+        except Exception as e:
+            print(f"❌ Failed to create flow '{flow_data['title']}': {e}")
+            if "exceeded" in str(e).lower() or "limit" in str(e).lower():
+                print("   💡 Your API plan may have reached the flow creation limit")
+                break
+    
+    return created_flows
+
+
+def create_custom_interview_flow(org_name: str, title: str, questions: list, interview_type: str = "general", **kwargs):
+    """Create a custom interview flow with specified parameters"""
+    client = RibbonClient()
+    
+    print(f"🎯 Creating Custom Interview Flow: {title}")
+    print("-" * 50)
+    
+    try:
+        # Create InterviewFlow object
+        flow = InterviewFlow(
+            org_name=org_name,
+            title=title,
+            questions=questions,
+            interview_type=interview_type,
+            **kwargs
+        )
+        
+        # Create the flow
+        result = client.create_interview_flows([flow])
+        flow_id = result.get('interview_flow_id')
+        
+        print(f"✅ Successfully created custom flow: {flow_id}")
+        print(f"   Organization: {org_name}")
+        print(f"   Title: {title}")
+        print(f"   Type: {interview_type}")
+        print(f"   Questions: {len(questions)}")
+        
+        # Display questions
+        print(f"\n📝 Questions:")
+        for i, question in enumerate(questions, 1):
+            print(f"   {i}. {question}")
+        
+        return {
+            'flow_id': flow_id,
+            'title': title,
+            'org_name': org_name,
+            'type': interview_type,
+            'questions_count': len(questions),
+            'flow_object': flow
+        }
+        
+    except Exception as e:
+        print(f"❌ Failed to create custom flow: {e}")
+        return None
+
+
+def demonstrate_flow_creation_workflow():
+    """Demonstrate a complete flow creation workflow"""
+    print("🚀 Complete Flow Creation Workflow")
+    print("=" * 60)
+    
+    # Step 1: Create a simple flow
+    print("\n📋 Step 1: Creating a Simple Interview Flow")
+    simple_flow = create_custom_interview_flow(
+        org_name="Demo Company",
+        title="Quick Team Check-in",
+        questions=[
+            "How are you feeling about your current projects?",
+            "What support do you need from the team?",
+            "Any blockers or challenges you're facing?",
+            "What's going well for you this week?"
+        ],
+        interview_type="general",
+        additional_info="Weekly team check-in interview"
+    )
+    
+    if not simple_flow:
+        print("❌ Could not create simple flow. Check your API limits.")
+        return None
+    
+    # Step 2: Test the flow immediately
+    print(f"\n🧪 Step 2: Testing the Created Flow")
+    test_interview = test_created_flow(simple_flow)
+    
+    # Step 3: Create a more complex flow
+    print(f"\n📋 Step 3: Creating a Complex Interview Flow")
+    complex_flow = create_custom_interview_flow(
+        org_name="Advanced Corp",
+        title="Senior Developer Deep Dive",
+        questions=[
+            "Describe your most complex technical architecture project.",
+            "How do you approach system design for high-scale applications?",
+            "Explain your experience with microservices and distributed systems.",
+            "How do you handle technical debt in legacy codebases?",
+            "Describe your approach to mentoring junior developers.",
+            "What's your philosophy on code reviews and quality assurance?",
+            "How do you stay current with emerging technologies?",
+            "Tell me about a time you had to make a critical technical decision under pressure."
+        ],
+        interview_type="recruitment",
+        additional_info="Senior level technical assessment",
+        is_video_enabled=True,  # Advanced feature
+        is_doc_upload_enabled=True  # For portfolio/code samples
+    )
+    
+    return {
+        'simple_flow': simple_flow,
+        'complex_flow': complex_flow,
+        'test_interview': test_interview
+    }
+
+
+def test_created_flow(flow_data):
+    """Test a newly created flow by creating a sample interview"""
+    if not flow_data:
+        return None
+        
+    client = RibbonClient()
+    flow_id = flow_data['flow_id']
+    
+    print(f"🧪 Testing Flow: {flow_data['title']} ({flow_id})")
+    
+    try:
+        # Create a test interview
+        config = InterviewConfig(
+            interview_flow_id=flow_id,
+            interviewee_email_address="test@example.com",
+            interviewee_first_name="Test",
+            interviewee_last_name="User"
+        )
+        
+        interview = client.create_interview(config)
+        interview_id = interview.get('interview_id')
+        interview_link = interview.get('interview_link')
+        
+        print(f"✅ Test interview created successfully!")
+        print(f"   Interview ID: {interview_id}")
+        print(f"   Interview Link: {interview_link}")
+        
+        return {
+            'interview_id': interview_id,
+            'interview_link': interview_link,
+            'flow_id': flow_id
+        }
+        
+    except Exception as e:
+        print(f"❌ Failed to create test interview: {e}")
+        return None
 
 
 def list_existing_flows():
@@ -180,67 +445,137 @@ def check_interview_results(interviews):
 
 
 def main():
-    """Main demonstration"""
+    """Main demonstration with flow creation options"""
     print("🎯 Ribbon AI Interview Management Demo")
     print("=" * 60)
     
-    # Step 1: Find working flows
-    working_flows = list_existing_flows()
+    # Ask user what they want to do
+    print("\n🔧 Choose an option:")
+    print("1. Create new interview flows")
+    print("2. Use existing flows")
+    print("3. Complete workflow (create + test)")
+    print("4. Create custom flow")
     
-    if not working_flows:
-        print("\n❌ No working flows found. You may need to:")
-        print("   1. Create new interview flows if your API plan allows")
-        print("   2. Use flow IDs from flows created with this account")
-        print("   3. Check your API key permissions")
+    choice = input("\nEnter your choice (1-4) or press Enter for option 2: ").strip()
+    
+    if choice == "1":
+        # Create sample flows
+        print("\n🚀 Creating Sample Interview Flows...")
+        created_flows = create_sample_interview_flows()
+        
+        if created_flows:
+            print(f"\n✅ Successfully created {len(created_flows)} flows!")
+            for flow in created_flows:
+                print(f"   - {flow['title']} (ID: {flow['flow_id']})")
+            
+            # Use the first created flow for demonstration
+            demo_flow = created_flows[0]
+            print(f"\n🎯 Using newly created flow for demonstration: {demo_flow['title']}")
+            
+            # Create interviews with the new flow
+            interviews = demonstrate_interview_management(demo_flow)
+            if interviews:
+                check_interview_results(interviews)
+        else:
+            print("\n❌ No flows were created. Falling back to existing flows...")
+            choice = "2"  # Fall through to existing flows
+    
+    elif choice == "3":
+        # Complete workflow
+        print("\n🚀 Running Complete Workflow...")
+        workflow_result = demonstrate_flow_creation_workflow()
+        
+        if workflow_result and workflow_result['simple_flow']:
+            print(f"\n🎯 Continuing with created flow for full demonstration...")
+            interviews = demonstrate_interview_management(workflow_result['simple_flow'])
+            if interviews:
+                check_interview_results(interviews)
         return
     
-    print(f"\n✅ Found {len(working_flows)} working flow(s)")
-    
-    # Step 2: Use the first working flow for demonstration
-    demo_flow = working_flows[0]
-    print(f"\n🎯 Using flow {demo_flow['flow_id']} for demonstration")
-    
-    # Step 3: Create multiple interviews
-    interviews = demonstrate_interview_management(demo_flow)
-    
-    if not interviews:
-        print("\n❌ No interviews were created successfully")
+    elif choice == "4":
+        # Create custom flow
+        print("\n🎯 Creating Custom Flow...")
+        print("Enter details for your custom interview flow:")
+        
+        org_name = input("Organization name: ").strip() or "My Company"
+        title = input("Interview title: ").strip() or "Custom Interview"
+        
+        print("\nEnter questions (press Enter twice when done):")
+        questions = []
+        while True:
+            question = input(f"Question {len(questions) + 1}: ").strip()
+            if not question:
+                if questions:  # If we have at least one question
+                    break
+                else:
+                    print("Please enter at least one question.")
+                    continue
+            questions.append(question)
+        
+        interview_type = input("\nInterview type (recruitment/general) [general]: ").strip().lower()
+        if interview_type not in ["recruitment", "general"]:
+            interview_type = "general"
+        
+        # Create the custom flow
+        custom_flow = create_custom_interview_flow(
+            org_name=org_name,
+            title=title,
+            questions=questions,
+            interview_type=interview_type
+        )
+        
+        if custom_flow:
+            # Test and demonstrate with the custom flow
+            test_created_flow(custom_flow)
+            interviews = demonstrate_interview_management(custom_flow)
+            if interviews:
+                check_interview_results(interviews)
         return
     
-    # Step 4: Check results
-    check_interview_results(interviews)
+    # Default: Use existing flows (option 2 or fallback)
+    if choice == "2" or choice == "":
+        print("\n🔍 Looking for existing flows...")
+        working_flows = list_existing_flows()
+        
+        if not working_flows:
+            print("\n❌ No working flows found. Let's create some!")
+            print("Creating sample flows...")
+            created_flows = create_sample_interview_flows()
+            
+            if created_flows:
+                working_flows = created_flows
+                print(f"✅ Created and will use {len(working_flows)} new flows")
+            else:
+                print("\n❌ Could not create or find any flows. Please check:")
+                print("   1. Your API key is valid")
+                print("   2. Your API plan allows flow creation")
+                print("   3. You haven't exceeded flow limits")
+                return
+        
+        print(f"\n✅ Found {len(working_flows)} working flow(s)")
+        
+        # Use the first working flow for demonstration
+        demo_flow = working_flows[0]
+        print(f"\n🎯 Using flow {demo_flow['flow_id']} for demonstration")
+        
+        # Create multiple interviews
+        interviews = demonstrate_interview_management(demo_flow)
+        
+        if not interviews:
+            print("\n❌ No interviews were created successfully")
+            return
+        
+        # Check results
+        check_interview_results(interviews)
     
-    # Step 5: Summary and next steps
-    print(f"\n📈 Demo Summary")
+    # Final summary
+    print(f"\n� Demo Complete!")
     print("-" * 30)
-    print(f"✅ Working flows found: {len(working_flows)}")
-    print(f"✅ Interviews created: {len(interviews)}")
-    
-    completed = 0
-    for interview_data in interviews:
-        try:
-            client = RibbonClient()
-            status = client.get_interview_status(interview_data['interview_id'])
-            if status == "completed":
-                completed += 1
-        except:
-            pass
-    
-    print(f"📊 Completed interviews: {completed}")
-    print(f"⏳ Pending interviews: {len(interviews) - completed}")
-    
-    if len(interviews) - completed > 0:
-        print(f"\n💡 Next Steps:")
-        print(f"   1. Share interview links with participants")
-        print(f"   2. Wait for participants to complete interviews")
-        print(f"   3. Run this script again to see results")
-        print(f"   4. Use the monitor_single_interview() function for real-time tracking")
-    
-    # Show monitoring command
-    if interviews:
-        sample = interviews[0]
-        print(f"\n🔄 To monitor a specific interview:")
-        print(f"   monitor_single_interview('{sample['interview_id']}')")
+    print("💡 You can now:")
+    print("   - Share interview links with participants")
+    print("   - Monitor interviews using monitor_single_interview()")
+    print("   - Create more flows with create_custom_interview_flow()")
+    print("   - Retrieve results when interviews are completed")
 
 
 def monitor_single_interview(interview_id: str, max_checks: int = 20, interval: int = 30):
@@ -292,5 +627,87 @@ def monitor_single_interview(interview_id: str, max_checks: int = 20, interval: 
 if __name__ == "__main__":
     main()
     
-    # To monitor a specific interview, uncomment and replace with actual ID:
+    # Example usage for creating specific flows:
+    
+    # To create a quick feedback flow:
+    # feedback_flow = create_custom_interview_flow(
+    #     org_name="Your Company",
+    #     title="Product Feedback",
+    #     questions=[
+    #         "What do you like most about our product?",
+    #         "What would you improve?",
+    #         "How likely are you to recommend us?"
+    #     ]
+    # )
+    
+    # To create a technical interview:
+    # tech_flow = create_custom_interview_flow(
+    #     org_name="Tech Corp",
+    #     title="Frontend Developer Interview", 
+    #     questions=[
+    #         "Explain your experience with React/Vue/Angular",
+    #         "How do you optimize web application performance?",
+    #         "Describe your CSS methodology and best practices"
+    #     ],
+    #     interview_type="recruitment"
+    # )
+    
+    # To monitor a specific interview:
     # monitor_single_interview("your-interview-id-here")
+
+
+# Quick utility functions for common use cases
+
+def quick_feedback_flow(org_name: str, product_name: str = "our product"):
+    """Create a quick customer feedback flow"""
+    return create_custom_interview_flow(
+        org_name=org_name,
+        title=f"{product_name} Feedback Collection",
+        questions=[
+            f"How would you rate your overall experience with {product_name}?",
+            f"What features of {product_name} do you find most valuable?",
+            f"What challenges have you encountered while using {product_name}?",
+            f"What improvements would you like to see in {product_name}?",
+            f"How likely are you to recommend {product_name} to others?",
+            "Any additional feedback or suggestions?"
+        ],
+        interview_type="general",
+        additional_info=f"Customer feedback collection for {product_name}"
+    )
+
+
+def quick_onboarding_flow(org_name: str):
+    """Create a quick employee onboarding feedback flow"""
+    return create_custom_interview_flow(
+        org_name=org_name,
+        title="New Employee Onboarding Feedback",
+        questions=[
+            "How would you rate your onboarding experience so far?",
+            "What aspects of onboarding were most helpful?",
+            "What information or support was missing during onboarding?",
+            "How well prepared do you feel for your new role?",
+            "What would you improve about the onboarding process?",
+            "Any other feedback about your first week?"
+        ],
+        interview_type="general",
+        additional_info="Collecting feedback on employee onboarding experience"
+    )
+
+
+def quick_exit_interview_flow(org_name: str):
+    """Create a quick exit interview flow"""
+    return create_custom_interview_flow(
+        org_name=org_name,
+        title="Exit Interview",
+        questions=[
+            "What is your primary reason for leaving?",
+            "How would you rate your overall experience working here?",
+            "What did you enjoy most about your role?",
+            "What would you change about your role or the company?",
+            "How would you rate your relationship with your manager?",
+            "Would you consider returning to work here in the future?",
+            "Any additional feedback for the organization?"
+        ],
+        interview_type="general",
+        additional_info="Exit interview to gather feedback from departing employees"
+    )
