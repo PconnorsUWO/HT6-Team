@@ -7,10 +7,13 @@ from werkzeug.utils import secure_filename
 import uuid
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pymongo import MongoClient
+from gridfs import GridFS
+from bson import ObjectId
 from dotenv import load_dotenv
 from twelvelabs import TwelveLabs
+import ffmpeg
 
 # Load environment variables
 load_dotenv()
@@ -49,6 +52,127 @@ twelvelabs_client = TwelveLabs(api_key=TWELVELABS_API_KEY) if TWELVELABS_API_KEY
 MONGODB_URI = os.getenv('MONGODB_URI')
 mongo_client = MongoClient(MONGODB_URI)
 db = mongo_client.virtual_tryon
+
+# Initialize GridFS for video storage
+fs = GridFS(db)
+
+def cleanup_expired_videos():
+    """Remove expired videos from GridFS"""
+    try:
+        current_time = datetime.utcnow()
+        expired_files = []
+        
+        # Find expired files
+        for grid_out in fs.find({"metadata.expires_at": {"$lt": current_time}}):
+            expired_files.append(grid_out._id)
+        
+        # Delete expired files
+        for file_id in expired_files:
+            try:
+                fs.delete(file_id)
+                print(f"Deleted expired video: {file_id}")
+            except Exception as e:
+                print(f"Error deleting expired video {file_id}: {e}")
+        
+        if expired_files:
+            print(f"Cleaned up {len(expired_files)} expired videos")
+            
+    except Exception as e:
+        print(f"Error in cleanup_expired_videos: {e}")
+
+def convert_video_to_mp4(input_path: str, output_path: str = None) -> str:
+    """
+    Convert video to MP4 format using FFmpeg
+    Ensures compatibility with TwelveLabs
+    """
+    try:
+        if output_path is None:
+            output_path = input_path.replace('.webm', '.mp4').replace('.mov', '.mp4')
+            if not output_path.endswith('.mp4'):
+                output_path = input_path + '.mp4'
+        
+        print(f"Converting video: {input_path} -> {output_path}")
+        
+        # Check if input file exists and has content
+        if not os.path.exists(input_path):
+            raise Exception(f"Input file does not exist: {input_path}")
+        
+        input_size = os.path.getsize(input_path)
+        if input_size < 1024:  # Less than 1KB
+            print(f"Warning: Input file is very small ({input_size} bytes)")
+        
+        # Try to get input video info
+        try:
+            probe = ffmpeg.probe(input_path)
+            if 'format' in probe and 'duration' in probe['format']:
+                duration = float(probe['format']['duration'])
+                print(f"Input video duration: {duration} seconds")
+                
+                if duration < 4.0:
+                    print(f"Warning: Input video is too short ({duration}s)")
+            else:
+                print("Warning: Could not determine input video duration")
+        except Exception as e:
+            print(f"Warning: Could not probe input video: {e}")
+        
+        # Convert to MP4 with H.264 codec (widely supported)
+        try:
+            stream = ffmpeg.input(input_path)
+            stream = ffmpeg.output(stream, output_path,
+                                 vcodec='libx264',  # H.264 codec
+                                 acodec='aac',      # AAC audio codec
+                                 video_bitrate='2M', # 2 Mbps video bitrate
+                                 audio_bitrate='128k', # 128 kbps audio bitrate
+                                 preset='fast',     # Fast encoding preset
+                                 movflags='+faststart', # Optimize for streaming
+                                 f='mp4')           # Force MP4 format
+            
+            # Run the conversion
+            ffmpeg.run(stream, overwrite_output=True, quiet=True)
+            
+        except Exception as e:
+            print(f"FFmpeg conversion failed: {e}")
+            # If conversion fails, try a simpler approach
+            try:
+                print("Trying simpler conversion...")
+                stream = ffmpeg.input(input_path)
+                stream = ffmpeg.output(stream, output_path, vcodec='libx264', preset='ultrafast')
+                ffmpeg.run(stream, overwrite_output=True, quiet=True)
+            except Exception as e2:
+                print(f"Simple conversion also failed: {e2}")
+                # If all conversion fails, return original path
+                return input_path
+        
+        # Verify the output file
+        if os.path.exists(output_path):
+            output_size = os.path.getsize(output_path)
+            print(f"Conversion successful: {output_path} ({output_size} bytes)")
+            
+            # Verify the converted video
+            try:
+                output_probe = ffmpeg.probe(output_path)
+                if 'format' in output_probe and 'duration' in output_probe['format']:
+                    output_duration = float(output_probe['format']['duration'])
+                    print(f"Output video duration: {output_duration} seconds")
+                    
+                    if output_duration < 4.0:
+                        print(f"Warning: Converted video is too short ({output_duration}s)")
+                    
+                    return output_path
+                else:
+                    print("Warning: Could not verify converted video duration")
+                    return output_path
+            except Exception as e:
+                print(f"Warning: Could not verify converted video: {e}")
+                return output_path
+        else:
+            print("Warning: Output file was not created, returning original")
+            return input_path
+            
+    except Exception as e:
+        print(f"Error in video conversion: {e}")
+        # If conversion fails, return original path
+        return input_path
 
 
 # Test video URL for TwelveLabs testing
@@ -115,50 +239,6 @@ def get_full_video_metadata(file_path: str) -> dict:
 
     return json.loads(result.stdout)
 
-def get_video_duration(video_path):
-    """Get video duration in seconds using ffprobe"""
-    try:
-        metadata = get_full_video_metadata(video_path)
-        
-        # Try to get duration from format first (works well with MP4)
-        if 'format' in metadata and 'duration' in metadata['format']:
-            duration = float(metadata['format']['duration'])
-            print(f"Duration from format metadata: {duration} seconds")
-            return duration
-        
-        # For video files, try to get duration from video stream
-        if 'streams' in metadata and len(metadata['streams']) > 0:
-            # Find the video stream
-            video_stream = next((s for s in metadata['streams'] if s.get('codec_type') == 'video'), None)
-            
-            if video_stream:
-                # Try to get duration from stream duration
-                if 'duration' in video_stream:
-                    duration = float(video_stream['duration'])
-                    print(f"Duration from video stream: {duration} seconds")
-                    return duration
-                
-                # Try to get duration from tags
-                if 'tags' in video_stream and 'DURATION' in video_stream['tags']:
-                    duration_str = video_stream['tags']['DURATION']
-                    try:
-                        import re
-                        match = re.match(r'(\d+):(\d+):(\d+\.\d+)', duration_str)
-                        if match:
-                            hours, minutes, seconds = match.groups()
-                            duration = float(hours) * 3600 + float(minutes) * 60 + float(seconds)
-                            print(f"Duration from stream tags: {duration} seconds")
-                            return duration
-                    except:
-                        pass
-        
-        # If we can't get exact duration, raise an error
-        raise ValueError("Could not determine exact video duration from metadata")
-        
-    except FileNotFoundError:
-        raise FileNotFoundError("ffprobe not found. Please install ffmpeg.")
-    except Exception as e:
-        raise Exception(f"Error getting video duration: {e}")
 
 def get_video_info(video_path):
     """Get comprehensive video information for debugging"""
@@ -289,9 +369,9 @@ def upload_garment():
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-@app.route('/process-video', methods=['POST'])
-def process_video():
-    """Process video recording with TwelveLabs to find best frames"""
+@app.route('/upload-video', methods=['POST'])
+def upload_video():
+    """Upload video to MongoDB GridFS and return public URL"""
     try:
         if 'video_file' not in request.files:
             return jsonify({"error": "No video file provided"}), 400
@@ -303,30 +383,145 @@ def process_video():
         if not allowed_file(video_file.filename):
             return jsonify({"error": "Invalid file type. Only MP4 and WebM formats are supported"}), 400
         
-        # Save video temporarily with correct extension
+        # Generate unique filename
         file_extension = video_file.filename.rsplit('.', 1)[1].lower() if '.' in video_file.filename else 'webm'
-        video_filename = secure_filename(f"video_{uuid.uuid4()}.{file_extension}")
-        video_path = os.path.join(app.config['UPLOAD_FOLDER'], video_filename)
-        video_file.save(video_path)
-
-        # # Get the exact video duration
-        # try:
-        #     duration = get_video_duration(video_path)
-        #     print(f"Video duration: {duration} seconds")
-            
-        #     # Validate duration is reasonable
-        #     if duration <= 0 or duration > 3600:
-        #         os.remove(video_path)
-        #         return jsonify({
-        #             "error": f"Video duration ({duration} seconds) is invalid. Must be between 0 and 3600 seconds."
-        #         }), 400
-                
-        # except Exception as e:
-        #     os.remove(video_path)
-        #     return jsonify({
-        #         "error": f"Failed to determine video duration: {str(e)}"
-        #     }), 400
+        video_filename = f"video_{uuid.uuid4()}.{file_extension}"
         
+        # Store video in GridFS
+        file_id = fs.put(
+            video_file.read(),
+            filename=video_filename,
+            content_type=f"video/{file_extension}",
+            metadata={
+                "upload_time": datetime.utcnow(),
+                "expires_at": datetime.utcnow() + timedelta(hours=24),  # Auto-delete after 24 hours
+                "original_filename": video_file.filename
+            }
+        )
+        
+        # Create public URL (you might want to set up a proper CDN or file serving endpoint)
+        # For now, we'll create a download endpoint
+        public_url = f"{request.host_url.rstrip('/')}/download-video/{str(file_id)}"
+        
+        return jsonify({
+            "success": True,
+            "video_id": str(file_id),
+            "public_url": public_url,
+            "filename": video_filename,
+            "message": "Video uploaded successfully"
+        })
+        
+    except Exception as e:
+        print(f"Error in upload_video: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@app.route('/download-video/<video_id>', methods=['GET'])
+def download_video(video_id):
+    """Download video from GridFS by ID"""
+    try:
+        # Get file from GridFS
+        grid_out = fs.get(ObjectId(video_id))
+        
+        # Check if file has expired
+        if 'expires_at' in grid_out.metadata:
+            expires_at = grid_out.metadata['expires_at']
+            if datetime.utcnow() > expires_at:
+                # Delete expired file
+                fs.delete(ObjectId(video_id))
+                return jsonify({"error": "Video has expired"}), 410
+        
+        # Return video file
+        return grid_out.read(), 200, {
+            'Content-Type': grid_out.content_type,
+            'Content-Disposition': f'attachment; filename="{grid_out.filename}"'
+        }
+        
+    except Exception as e:
+        print(f"Error downloading video {video_id}: {str(e)}")
+        return jsonify({"error": "Video not found"}), 404
+
+@app.route('/cleanup-videos', methods=['POST'])
+def cleanup_videos():
+    """Manually trigger cleanup of expired videos"""
+    try:
+        cleanup_expired_videos()
+        return jsonify({
+            "success": True,
+            "message": "Cleanup completed"
+        })
+    except Exception as e:
+        return jsonify({
+            "error": f"Cleanup failed: {str(e)}"
+        }), 500
+
+@app.route('/process-video', methods=['POST'])
+def process_video():
+    """Process video using MongoDB URL with TwelveLabs to find best frames"""
+    try:
+        data = request.get_json()
+        if not data or 'video_url' not in data:
+            return jsonify({"error": "No video URL provided"}), 400
+        
+        video_url = data['video_url']
+        print(f"Processing video from URL: {video_url}")
+        
+        # Download video from MongoDB URL
+        try:
+            video_response = requests.get(video_url, stream=True)
+            if video_response.status_code != 200:
+                return jsonify({"error": "Failed to download video from MongoDB"}), 500
+            
+            # Get content info for debugging
+            content_type = video_response.headers.get('content-type', 'unknown')
+            content_length = video_response.headers.get('content-length', 'unknown')
+            print(f"Downloaded video - Content-Type: {content_type}, Content-Length: {content_length}")
+            
+            # Save video temporarily with original extension
+            original_filename = f"temp_video_{uuid.uuid4()}"
+            if 'webm' in content_type.lower():
+                original_filename += '.webm'
+            elif 'mp4' in content_type.lower():
+                original_filename += '.mp4'
+            else:
+                original_filename += '.mp4'  # default
+            
+            original_video_path = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
+            
+            total_bytes = 0
+            with open(original_video_path, 'wb') as f:
+                for chunk in video_response.iter_content(chunk_size=8192):
+                    if chunk:  # filter out keep-alive chunks
+                        f.write(chunk)
+                        total_bytes += len(chunk)
+            
+            print(f"Original video saved to {original_video_path}, total bytes: {total_bytes}")
+            
+            # Validate the downloaded video file
+            if total_bytes < 1024:  # Less than 1KB is suspicious
+                os.remove(original_video_path)
+                return jsonify({"error": f"Downloaded video is too small ({total_bytes} bytes)"}), 400
+            
+            # Convert video to MP4 format for TwelveLabs compatibility
+            print("Converting video to MP4 format...")
+            video_path = convert_video_to_mp4(original_video_path)
+            
+            # Clean up original file if it's different from converted file
+            if original_video_path != video_path and os.path.exists(original_video_path):
+                os.remove(original_video_path)
+                print(f"Cleaned up original file: {original_video_path}")
+            
+            # Try to get video info for debugging
+            try:
+                video_info = get_video_info(video_path)
+                print(f"Converted video info: {video_info}")
+            except Exception as e:
+                print(f"Could not get video info: {e}")
+                    
+        except Exception as e:
+            return jsonify({"error": f"Failed to download video: {str(e)}"}), 500
+
         # Upload to TwelveLabs using the SDK
         if not twelvelabs_client:
             print("TwelveLabs API key not configured, returning mock response")
@@ -347,7 +542,7 @@ def process_video():
         # Get or create an index
         try:
             indexes = twelvelabs_client.index.list()
-            if indexes:
+            if indexes and len(indexes) > 0:
                 index_id = indexes[0].id
             else:
                 # Create a new index if none exists
@@ -357,46 +552,72 @@ def process_video():
                     model="gpt-4"
                 )
                 index_id = index.id
+            print(f"Using index ID: {index_id}")
         except Exception as e:
             print(f"Error with index: {e}")
             index_id = "default"
         
         # Upload the video
         try:
+            print(f"Uploading video to TwelveLabs: {video_path}")
             task = twelvelabs_client.task.create(
                 index_id=index_id,
                 file=video_path
             )
             
+            print(f"Upload task created: {task.id}")
+            
             # Wait for the task to complete
             import time
             while True:
                 task_status = twelvelabs_client.task.retrieve(task.id)
+                print(f"Task status: {task_status.status}")
                 
                 if task_status.status == "ready":
                     video_id = task_status.video_id
                     break
                 elif task_status.status == "failed":
-                    return jsonify({"error": "Video upload failed"}), 500
+                    error_details = getattr(task_status, 'error', 'Unknown error')
+                    print(f"Task failed: {error_details}")
+                    return jsonify({"error": f"Video upload failed: {error_details}"}), 500
                 
                 time.sleep(2)
             
+            print(f"Video uploaded successfully with ID: {video_id}")
+            
         except Exception as e:
+            print(f"Exception during TwelveLabs upload: {str(e)}")
             return jsonify({"error": f"Failed to upload video to TwelveLabs: {str(e)}"}), 500
         
         # Search for frames where person is standing still
         try:
-            search_results = twelvelabs_client.search(
+            print("Searching for suitable frames...")
+            search_results = twelvelabs_client.search.query(
                 index_id=index_id,
-                query="person standing still, full body visible, good lighting",
-                video_ids=[video_id],
-                search_options=["visual", "conversation", "text_in_video"]
+                query_text="person standing still, full body visible, good lighting",
+                options=["visual"]
             )
+            print(f"Search completed, found {len(search_results.data) if hasattr(search_results, 'data') else 0} results")
+            # write to a file
+            with open('search_results.json', 'w') as f:
+                json.dump(search_results, f)
+                
         except Exception as e:
             return jsonify({"error": f"Failed to search video frames: {str(e)}"}), 500
         
-        # Get the best frame
-        best_frame = search_results.data[0] if search_results.data else None
+        # Get the best frame and convert to dict
+        best_frame = None
+        if hasattr(search_results, 'data') and search_results.data:
+            # Convert SearchData object to dictionary
+            raw_frame = search_results.data[0]
+            best_frame = {
+                'video_id': getattr(raw_frame, 'video_id', None),
+                'score': getattr(raw_frame, 'score', None),
+                'start': getattr(raw_frame, 'start', None),
+                'end': getattr(raw_frame, 'end', None),
+                'thumbnail_url': getattr(raw_frame, 'thumbnail_url', None),
+                'text': getattr(raw_frame, 'text', None)
+            }
         
         # Clean up video file
         os.remove(video_path)
@@ -451,7 +672,7 @@ def test_twelvelabs():
         # First, get or create an index
         try:
             indexes = twelvelabs_client.index.list()
-            if indexes:
+            if indexes and len(indexes) > 0:
                 index_id = indexes[0].id
             else:
                 # Create a new index if none exists
@@ -461,6 +682,7 @@ def test_twelvelabs():
                     model="gpt-4"
                 )
                 index_id = index.id
+            print(f"Using index ID: {index_id}")
         except Exception as e:
             print(f"Error with index: {e}")
             # Use a default index ID
@@ -503,14 +725,14 @@ def test_twelvelabs():
         # Search for frames where person is standing still
         try:
             print("Searching for suitable frames...")
-            search_results = twelvelabs_client.search(
+            search_results = twelvelabs_client.search.query(
                 index_id=index_id,
                 query="person standing still, full body visible, good lighting",
                 video_ids=[video_id],
                 search_options=["visual"]
             )
             
-            print(f"Search completed, found {len(search_results.data)} results")
+            print(f"Search completed, found {len(search_results.data) if hasattr(search_results, 'data') else 0} results")
             
         except Exception as e:
             return jsonify({
@@ -518,8 +740,19 @@ def test_twelvelabs():
                 "details": str(e)
             }), 500
         
-        # Get the best frame
-        best_frame = search_results.data[0] if search_results.data else None
+        # Get the best frame and convert to dict
+        best_frame = None
+        if hasattr(search_results, 'data') and search_results.data:
+            # Convert SearchData object to dictionary
+            raw_frame = search_results.data[0]
+            best_frame = {
+                'video_id': getattr(raw_frame, 'video_id', None),
+                'score': getattr(raw_frame, 'score', None),
+                'start': getattr(raw_frame, 'start', None),
+                'end': getattr(raw_frame, 'end', None),
+                'thumbnail_url': getattr(raw_frame, 'thumbnail_url', None),
+                'text': getattr(raw_frame, 'text', None)
+            }
         
         # Clean up video file
         os.remove(video_path)
@@ -527,16 +760,14 @@ def test_twelvelabs():
         if not best_frame:
             return jsonify({
                 "success": False,
-                "message": "No suitable frames found in video",
-                "search_results": search_results
+                "message": "No suitable frames found in video"
             }), 400
         
         return jsonify({
             "success": True,
             "best_frame": best_frame,
             "video_id": video_id,
-            "message": "Test video processed successfully with TwelveLabs",
-            "search_results": search_results
+            "message": "Test video processed successfully with TwelveLabs"
         })
         
     except Exception as e:

@@ -1,304 +1,131 @@
-# Virtual Try-On Flask API
+# Virtual Try-On Backend API
 
-A Flask-based REST API that provides virtual try-on functionality using the IDM-VTON model from Hugging Face.
+A Flask-based backend API for virtual try-on functionality with video processing and AI recommendations.
 
 ## Features
 
-- Virtual try-on using person and garment images
-- Support for both file uploads and image URLs
-- RESTful API endpoints
-- File upload handling
-- CORS support for frontend integration
-- Health check and API information endpoints
-- TwelveLabs video processing integration
-- MongoDB storage for garments and results
-- Vellum AI recommendations
-- Test video integration for development
+- **Video Processing**: Upload videos to MongoDB GridFS and process them with TwelveLabs AI
+- **Virtual Try-On**: AI-powered clothing try-on using Gradio client
+- **Garment Management**: Upload custom garments and manage preset garments
+- **AI Recommendations**: Generate style recommendations based on try-on results
+- **User History**: Track user interactions and try-on history
+
+## New Video Processing Architecture
+
+The application now uses a two-step video processing approach with **FFmpeg conversion**:
+
+### Step 1: Video Upload to MongoDB
+
+- Videos are uploaded to MongoDB GridFS for temporary storage
+- Each video gets a unique ID and public URL
+- Videos automatically expire after 24 hours
+- Supports MP4 and WebM formats
+
+### Step 2: FFmpeg Video Conversion
+
+- **NEW**: Browser-recorded videos are converted to MP4 using FFmpeg
+- Ensures compatibility with TwelveLabs API requirements
+- Converts WebM/other formats to H.264 MP4 with proper headers
+- Validates video duration and quality
+
+### Step 3: TwelveLabs Processing
+
+- The converted MP4 video URL is sent to TwelveLabs for AI analysis
+- TwelveLabs finds the best frame for virtual try-on
+- Results include frame selection and confidence scores
+
+## API Endpoints
+
+### Video Processing
+
+- `POST /upload-video` - Upload video to MongoDB GridFS
+- `GET /download-video/<video_id>` - Download video from MongoDB
+- `POST /process-video` - Process video with TwelveLabs (uses MongoDB URL)
+- `POST /cleanup-videos` - Manually trigger cleanup of expired videos
+
+### Try-On
+
+- `POST /tryon` - Perform virtual try-on with selected frame and garment
+- `GET /preset-garments` - Get list of preset garments
+- `POST /upload-garment` - Upload custom garment
+
+### User Management
+
+- `GET /user-history/<user_id>` - Get user's try-on history
+
+### Testing
+
+- `GET /test` - Test backend connectivity
+- `GET /health` - Health check endpoint
+- `GET /test-twelvelabs` - Test TwelveLabs integration
+
+## Environment Variables
+
+Create a `.env` file with the following variables:
+
+```env
+MONGODB_URI=mongodb://localhost:27017/virtual_tryon
+TWELVELABS_API_KEY=your_twelvelabs_api_key
+VELLUM_API_KEY=your_vellum_api_key
+```
 
 ## Installation
 
 1. Install dependencies:
 
 ```bash
-uv add flask flask-cors werkzeug gradio-client requests pymongo python-dotenv twelvelabs
+uv sync
 ```
 
-2. Set up environment variables (create a `.env` file):
+2. Set up environment variables in `.env`
 
-```bash
-# Required for TwelveLabs integration
-TWELVELABS_API_KEY=your_twelvelabs_api_key_here
-
-# Required for Vellum recommendations
-VELLUM_API_KEY=your_vellum_api_key_here
-
-# MongoDB connection (optional, has default)
-MONGODB_URI=your_mongodb_connection_string
-```
-
-2. Make sure you have the required image files:
-   - `person.jpg` - Person image for try-on
-   - `garment.jpg` - Garment image to try on
-
-## Running the API
-
-Start the Flask server:
+3. Start the server:
 
 ```bash
 uv run python app.py
 ```
 
-The API will be available at `http://localhost:5000`
+## Video Processing Flow
 
-## API Endpoints
+1. **Frontend**: User records video using browser's MediaRecorder API
+2. **Upload**: Video blob is uploaded to `/upload-video` endpoint
+3. **MongoDB Storage**: Video is stored in GridFS with 24-hour expiration
+4. **Download**: Video is downloaded from MongoDB URL
+5. **FFmpeg Conversion**: Video is converted to MP4 format with H.264 codec
+6. **Processing**: Converted video is sent to `/process-video` for TwelveLabs analysis
+7. **Frame Selection**: AI finds the best frame for virtual try-on
+8. **Try-On**: Selected frame and garment are processed for virtual try-on
+9. **Cleanup**: Expired videos are automatically removed
 
-### 1. Health Check
+## Testing
 
-**GET** `/health`
-
-Check if the API is running.
-
-**Response:**
-
-```json
-{
-  "status": "healthy",
-  "message": "Virtual Try-On API is running"
-}
-```
-
-### 2. API Information
-
-**GET** `/api-info`
-
-Get information about available endpoints and the underlying Gradio API.
-
-**Response:**
-
-```json
-{
-  "api_info": "Client.predict() Usage Info...",
-  "endpoints": {
-    "health": "GET /health",
-    "tryon": "POST /tryon",
-    "download": "GET /download/<filename>",
-    "api_info": "GET /api-info"
-  }
-}
-```
-
-### 3. Virtual Try-On
-
-**POST** `/tryon`
-
-Perform virtual try-on with uploaded images or image URLs.
-
-**Request Options:**
-
-**Option 1: File Upload**
-
-- Content-Type: `multipart/form-data`
-- Files:
-  - `person_image`: Person image file (required)
-  - `garment_image`: Garment image file (required)
-- Form data (optional):
-  - `garment_description`: Description of the garment (default: "Virtual try-on")
-  - `is_checked`: Boolean flag (default: true)
-  - `is_checked_crop`: Boolean flag (default: false)
-  - `denoise_steps`: Number of denoising steps (default: 30)
-  - `seed`: Random seed (default: 42)
-
-**Option 2: Image URLs**
-
-- Content-Type: `application/x-www-form-urlencoded` or `multipart/form-data`
-- Form data:
-  - `person_image_url`: URL to person image (required)
-  - `garment_image_url`: URL to garment image (required)
-  - `garment_description`: Description of the garment (optional, default: "Virtual try-on")
-  - `is_checked`: Boolean flag (optional, default: true)
-  - `is_checked_crop`: Boolean flag (optional, default: false)
-  - `denoise_steps`: Number of denoising steps (optional, default: 30)
-  - `seed`: Random seed (optional, default: 42)
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "output_image": "/path/to/output/image.png",
-  "masked_image": "/path/to/masked/image.png",
-  "message": "Virtual try-on completed successfully"
-}
-```
-
-### 4. Download Generated Images
-
-**GET** `/download/<filename>`
-
-Download generated images by providing the file path.
-
-### 5. Test TwelveLabs Integration
-
-**GET** `/test-twelvelabs`
-
-Test video download functionality using the provided test video URL.
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "message": "Test video downloaded successfully",
-  "video_url": "https://videos.pexels.com/video-files/5058382/5058382-uhd_2560_1440_25fps.mp4",
-  "content_type": "video/mp4",
-  "content_length": "12345678",
-  "file_size_bytes": 12345678,
-  "file_size_mb": 11.77
-}
-```
-
-**POST** `/test-twelvelabs`
-
-Test full TwelveLabs integration with video processing and frame analysis.
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "best_frame": {
-    "video_id": "video_123",
-    "score": 0.95,
-    "start": 2.5,
-    "end": 3.0
-  },
-  "video_id": "video_123",
-  "message": "Test video processed successfully with TwelveLabs"
-}
-```
-
-### 6. Preset Garments
-
-**GET** `/preset-garments`
-
-Get available preset garments for testing.
-
-### 7. Upload Custom Garment
-
-**POST** `/upload-garment`
-
-Upload a custom garment image to MongoDB.
-
-### 8. User History
-
-**GET** `/user-history/<user_id>`
-
-Get user's try-on history from MongoDB.
-
-## Testing the API
-
-Run the test script to verify the API functionality:
+Run the test script to verify the new video processing functionality:
 
 ```bash
-uv run python test_api.py
+uv run python test_mongodb_video.py
 ```
 
-### Testing TwelveLabs Integration
+This will test:
 
-Test the new TwelveLabs functionality:
+- Backend connectivity
+- Video upload to MongoDB
+- Video download from MongoDB
+- Video processing with TwelveLabs
 
-```bash
-# Test video download
-uv run python test_twelvelabs.py
+## Benefits of New Approach
 
-# Or test manually with curl:
-curl http://localhost:5000/test-twelvelabs
-curl -X POST http://localhost:5000/test-twelvelabs
-```
-
-## Example Usage
-
-### Using curl:
-
-```bash
-# Health check
-curl http://localhost:5000/health
-
-# Virtual try-on with file uploads
-curl -X POST http://localhost:5000/tryon \
-  -F "person_image=@person.jpg" \
-  -F "garment_image=@garment.jpg" \
-  -F "garment_description=Blue shirt" \
-  -F "denoise_steps=30" \
-  -F "seed=42"
-
-# Virtual try-on with image URLs
-curl -X POST http://localhost:5000/tryon \
-  -d "person_image_url=https://example.com/person.jpg" \
-  -d "garment_image_url=https://example.com/garment.jpg" \
-  -d "garment_description=Blue shirt" \
-  -d "denoise_steps=30" \
-  -d "seed=42"
-```
-
-### Using Python requests:
-
-```python
-import requests
-
-# Option 1: Upload images for virtual try-on
-files = {
-    'person_image': open('person.jpg', 'rb'),
-    'garment_image': open('garment.jpg', 'rb')
-}
-
-data = {
-    'garment_description': 'Blue shirt',
-    'denoise_steps': '30',
-    'seed': '42'
-}
-
-response = requests.post('http://localhost:5000/tryon', files=files, data=data)
-result = response.json()
-
-print(f"Output image: {result['output_image']}")
-print(f"Masked image: {result['masked_image']}")
-
-# Option 2: Use image URLs for virtual try-on
-data = {
-    'person_image_url': 'https://example.com/person.jpg',
-    'garment_image_url': 'https://example.com/garment.jpg',
-    'garment_description': 'Blue shirt',
-    'denoise_steps': '30',
-    'seed': '42'
-}
-
-response = requests.post('http://localhost:5000/tryon', data=data)
-result = response.json()
-
-print(f"Output image: {result['output_image']}")
-print(f"Masked image: {result['masked_image']}")
-```
+- **Scalability**: Videos are stored in MongoDB instead of local filesystem
+- **Reliability**: GridFS handles large files efficiently
+- **Format Compatibility**: FFmpeg ensures all videos are converted to TwelveLabs-compatible MP4
+- **Cleanup**: Automatic expiration prevents storage bloat
+- **URL-based**: TwelveLabs can access videos via HTTP URLs
+- **Stateless**: Backend doesn't need to manage local video files
+- **Robust Processing**: Browser-recorded videos are properly converted and validated
 
 ## Error Handling
 
-The API returns appropriate HTTP status codes and error messages:
-
-- `400 Bad Request`: Missing files or invalid file types
-- `404 Not Found`: File not found for download
-- `500 Internal Server Error`: Server-side errors
-
-## File Requirements
-
-- Supported image formats: PNG, JPG, JPEG, GIF
-- Maximum file size: 16MB per file
-- Images are temporarily stored and automatically cleaned up after processing
-
-## Notes
-
-- The API uses the IDM-VTON model from Hugging Face
-- Processing may take some time depending on the model's current load
-- Generated images are stored in temporary locations and should be downloaded promptly
-- CORS is enabled for frontend integration
-- TwelveLabs integration uses the official Python SDK for video processing
-- The system automatically creates indexes and manages video uploads through the SDK
+- Videos automatically expire after 24 hours
+- Failed uploads are cleaned up immediately
+- Network errors are handled gracefully
+- Invalid video formats are rejected
+- TwelveLabs API errors are logged and reported
