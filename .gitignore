@@ -1,6 +1,28 @@
 backend/.env
 backend/uploads/*
 
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
 # IDE and editor files
 .vscode/
 .history/
@@ -14,6 +36,7 @@ backend/uploads/*
 *.log
 *.bak
 *.swp
+*.env
 
 # System files
 *.DS_Store

@@ -10,6 +10,8 @@ from services.realtime_detection import RealtimeBodyDetector
 from routes.garments import garments_bp
 from routes.videos import videos_bp
 from routes.tryon import tryon_bp
+from routes.interview import interview_bp
+from routes.recommendations import recommendations_bp
 
 def create_app():
     """Create and configure the Flask application"""
@@ -36,6 +38,8 @@ def create_app():
     app.register_blueprint(garments_bp, url_prefix='/api')
     app.register_blueprint(videos_bp, url_prefix='/api')
     app.register_blueprint(tryon_bp, url_prefix='/api')
+    app.register_blueprint(interview_bp, url_prefix='/api/interview')
+    app.register_blueprint(recommendations_bp, url_prefix='/api/recommendations')
     
     # WebSocket event handlers
     @socketio.on('connect')
@@ -126,7 +130,22 @@ def create_app():
         return jsonify({
             "status": "healthy", 
             "message": "Virtual Try-On API is running",
-            "features": ["video_recording", "opencv_body_detection", "mongodb_storage", "vellum_recommendations", "realtime_streaming"],
+            "features": [
+                "video_recording", 
+                "opencv_body_detection", 
+                "mongodb_storage", 
+                "vellum_recommendations",
+                "ribbon_interviews",
+                "style_recommendations",
+                "realtime_streaming"
+            ],
+            "endpoints": {
+                "garments": "/api/preset-garments, /api/upload-garment",
+                "video": "/api/record-video, /api/test-body-detection",
+                "tryon": "/api/virtual-tryon",
+                "interviews": "/api/interview/create-flow, /api/interview/create-interview",
+                "recommendations": "/api/recommendations/style-recommendations"
+            },
             "test_endpoints": {
                 "test_video_download": "GET /api/test-body-detection",
                 "test_body_detection_full": "POST /api/test-body-detection"
