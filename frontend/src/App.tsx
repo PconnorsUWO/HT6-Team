@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import ApiTester from "./ApiTester";
-import RealtimeStreaming from "./components/RealtimeStreaming";
+import SeamlessVideoStream from "./components/SeamlessVideoStream";
 import type { AnnotatedFrameData } from "./services/streamingService";
 
 interface Garment {
@@ -588,9 +587,10 @@ function App() {
 
             {/* Real-time Streaming Component */}
             {useRealtimeStreaming && (
-              <RealtimeStreaming
+              <SeamlessVideoStream
                 onFrameSelected={handleFrameSelected}
                 onError={handleStreamingError}
+                confidenceThreshold={0.65}
               />
             )}
 
@@ -1011,7 +1011,7 @@ function App() {
       </footer>
 
       {/* API Tester for Development */}
-      <ApiTester />
+      {/* <ApiTester /> */}
     </div>
   );
 }

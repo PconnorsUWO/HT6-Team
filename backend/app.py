@@ -29,6 +29,9 @@ def create_app():
     # Initialize real-time body detector
     detector = RealtimeBodyDetector()
     
+    # Store detector instance for access from endpoints
+    app.detector = detector
+    
     # Register blueprints
     app.register_blueprint(garments_bp, url_prefix='/api')
     app.register_blueprint(videos_bp, url_prefix='/api')
@@ -71,12 +74,16 @@ def create_app():
                 emit('frame_error', {'error': 'No frame data provided'})
                 return
             
+            print(f"🔄 Processing frame from client {request.sid}")
+            
             # Process frame with body detection
             result = detector.process_frame(frame_data)
             
             if 'error' in result:
+                print(f"❌ Frame processing error: {result['error']}")
                 emit('frame_error', result)
             else:
+                print(f"✅ Frame processed successfully - Confidence: {result['confidence']:.3f}")
                 # Send annotated frame back to client
                 emit('annotated_frame', {
                     'annotated_frame': result['annotated_frame'],
@@ -84,10 +91,7 @@ def create_app():
                     'frame_number': result['frame_number'],
                     'timestamp': result['timestamp'],
                     'detection_quality': result['detection_quality'],
-                    'faces': result['faces'],
-                    'bodies': result['bodies'],
-                    'eyes': result['eyes'],
-                    'pose_landmarks': result['pose_landmarks']
+                    'essential_landmarks': result['essential_landmarks']
                 })
                 
         except Exception as e:
@@ -143,6 +147,39 @@ def create_app():
             "message": "Backend is running and CORS is working!",
             "timestamp": datetime.utcnow().isoformat()
         })
+    
+    # Get best frame endpoint
+    @app.route('/api/best-frame', methods=['GET'])
+    def get_best_frame():
+        """Get the best frame captured during real-time detection"""
+        try:
+            best_frame, best_confidence = detector.get_best_frame()
+            
+            if best_frame is None:
+                return jsonify({
+                    "success": False,
+                    "error": "No frames have been processed yet"
+                }), 404
+            
+            # Convert frame to base64
+            import cv2
+            import base64
+            _, buffer = cv2.imencode('.jpg', best_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            frame_b64 = base64.b64encode(buffer).decode('utf-8')
+            
+            return jsonify({
+                "success": True,
+                "best_frame": f"data:image/jpeg;base64,{frame_b64}",
+                "confidence": best_confidence,
+                "message": "Best frame retrieved successfully"
+            })
+            
+        except Exception as e:
+            print(f"Error getting best frame: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": f"Failed to get best frame: {str(e)}"
+            }), 500
     
     return app, socketio
 

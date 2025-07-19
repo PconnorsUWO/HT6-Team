@@ -2,43 +2,77 @@ import cv2
 import numpy as np
 import base64
 import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 from typing import Dict, List, Tuple, Optional
 
 class RealtimeBodyDetector:
-    """Real-time body detection service using OpenCV and MediaPipe"""
+    """Optimized real-time body detection focusing only on torso, legs, and arms"""
     
     def __init__(self):
-        """Initialize detection models"""
-        # OpenCV Haar cascades for basic detection
-        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        self.face_alt_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_alt.xml')
-        self.body_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fullbody.xml')
-        self.upper_body_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_upperbody.xml')
-        self.eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
-        
-        # MediaPipe for enhanced pose detection
+        """Initialize detection models with minimal processing"""
+        # MediaPipe for essential pose detection only
         self.mp_pose = mp.solutions.pose.Pose(
             static_image_mode=False,
-            model_complexity=1,
-            smooth_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            model_complexity=0,  # Use fastest model
+            smooth_landmarks=False,  # Disable smoothing for speed
+            min_detection_confidence=0.3,  # Lower threshold for speed
+            min_tracking_confidence=0.3
         )
         self.mp_drawing = mp.solutions.drawing_utils
-        self.mp_drawing_styles = mp.solutions.drawing_styles
         
         # Get pose connections from the correct module
         self.pose_connections = mp.solutions.pose.POSE_CONNECTIONS
         
         # Detection state
         self.frame_count = 0
-        self.detection_history = []
+        self.best_confidence = 0.0
+        self.best_frame = None
+        
+        # Purple color for brand consistency (BGR format)
+        self.brand_color = (255, 0, 255)  # Purple in BGR
+        
+        # Define essential body parts for virtual try-on
+        self.essential_landmarks = {
+            # Torso
+            'left_shoulder': mp.solutions.pose.PoseLandmark.LEFT_SHOULDER,
+            'right_shoulder': mp.solutions.pose.PoseLandmark.RIGHT_SHOULDER,
+            'left_hip': mp.solutions.pose.PoseLandmark.LEFT_HIP,
+            'right_hip': mp.solutions.pose.PoseLandmark.RIGHT_HIP,
+            
+            # Arms
+            'left_elbow': mp.solutions.pose.PoseLandmark.LEFT_ELBOW,
+            'right_elbow': mp.solutions.pose.PoseLandmark.RIGHT_ELBOW,
+            'left_wrist': mp.solutions.pose.PoseLandmark.LEFT_WRIST,
+            'right_wrist': mp.solutions.pose.PoseLandmark.RIGHT_WRIST,
+            
+            # Legs
+            'left_knee': mp.solutions.pose.PoseLandmark.LEFT_KNEE,
+            'right_knee': mp.solutions.pose.PoseLandmark.RIGHT_KNEE,
+            'left_ankle': mp.solutions.pose.PoseLandmark.LEFT_ANKLE,
+            'right_ankle': mp.solutions.pose.PoseLandmark.RIGHT_ANKLE,
+        }
+        
+    def calculate_essential_confidence(self, landmarks) -> float:
+        """Calculate confidence based only on essential body parts (torso, legs, arms)"""
+        if not landmarks:
+            return 0.0
+        
+        # Count visible essential parts
+        visible_essential = 0
+        total_essential = len(self.essential_landmarks)
+        
+        for landmark_id in self.essential_landmarks.values():
+            if landmark_id < len(landmarks.landmark):
+                landmark = landmarks.landmark[landmark_id]
+                if landmark.visibility > 0.3:  # Lower threshold for speed
+                    visible_essential += 1
+        
+        # Simple confidence calculation
+        confidence = visible_essential / total_essential if total_essential > 0 else 0
+        return min(confidence, 1.0)
         
     def process_frame(self, frame_data: str) -> Dict:
         """
-        Process a single video frame and return annotated frame with detection results
+        Process a single video frame with minimal processing
         
         Args:
             frame_data: Base64 encoded image data
@@ -61,12 +95,18 @@ class RealtimeBodyDetector:
             # Convert to RGB for MediaPipe
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
-            # Get detections
-            detection_results = self._detect_body_parts(frame, frame_rgb, annotated_frame)
+            # Get essential body part detection
+            detection_results = self._detect_essential_parts(frame_rgb, annotated_frame)
+            
+            # Update best confidence tracking
+            if detection_results["confidence"] > self.best_confidence:
+                self.best_confidence = detection_results["confidence"]
+                self.best_frame = annotated_frame.copy()
             
             # Add frame info
             detection_results["frame_number"] = self.frame_count
             detection_results["timestamp"] = self.frame_count / 30.0  # Assuming 30 FPS
+            detection_results["best_confidence"] = self.best_confidence
             
             # Update frame counter
             self.frame_count += 1
@@ -82,173 +122,89 @@ class RealtimeBodyDetector:
             print(f"Error processing frame: {str(e)}")
             return {"error": f"Frame processing error: {str(e)}"}
     
-    def _detect_body_parts(self, frame: np.ndarray, frame_rgb: np.ndarray, annotated_frame: np.ndarray) -> Dict:
-        """Detect body parts using OpenCV and MediaPipe"""
-        height, width = frame.shape[:2]
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    def _detect_essential_parts(self, frame_rgb: np.ndarray, annotated_frame: np.ndarray) -> Dict:
+        """Detect only essential body parts (torso, legs, arms) with minimal processing"""
+        height, width = frame_rgb.shape[:2]
         
         detection_results = {
-            "faces": [],
-            "bodies": [],
-            "eyes": [],
-            "pose_landmarks": [],
             "confidence": 0.0,
-            "detection_quality": {}
+            "detection_quality": {},
+            "essential_landmarks": []
         }
         
-        # 1. OpenCV Face Detection
-        faces1 = self.face_cascade.detectMultiScale(gray, 1.1, 4, minSize=(30, 30))
-        faces2 = self.face_alt_cascade.detectMultiScale(gray, 1.1, 4, minSize=(30, 30))
-        
-        # Combine and deduplicate faces
-        all_faces = list(faces1) + list(faces2)
-        faces = self._deduplicate_detections(all_faces, 0.5)
-        
-        for i, (x, y, w, h) in enumerate(faces):
-            cv2.rectangle(annotated_frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-            cv2.putText(annotated_frame, f'Face {i+1}', (x, y-10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            
-            detection_results["faces"].append({
-                "x": int(x), "y": int(y), "width": int(w), "height": int(h),
-                "confidence": 0.8
-            })
-            
-            # Detect eyes within face region
-            face_roi = gray[y:y+h, x:x+w]
-            eyes = self.eye_cascade.detectMultiScale(face_roi, 1.1, 3, minSize=(20, 20))
-            for (ex, ey, ew, eh) in eyes:
-                cv2.rectangle(annotated_frame, (x+ex, y+ey), (x+ex+ew, y+ey+eh), (255, 255, 0), 1)
-                detection_results["eyes"].append({
-                    "x": int(x+ex), "y": int(y+ey), "width": int(ew), "height": int(eh),
-                    "confidence": 0.7
-                })
-        
-        # 2. OpenCV Body Detection
-        bodies = self.body_cascade.detectMultiScale(gray, 1.1, 4, minSize=(50, 100))
-        upper_bodies = self.upper_body_cascade.detectMultiScale(gray, 1.1, 4, minSize=(50, 50))
-        
-        all_bodies = list(bodies) + list(upper_bodies)
-        bodies = self._deduplicate_detections(all_bodies, 0.7)
-        
-        for i, (x, y, w, h) in enumerate(bodies):
-            cv2.rectangle(annotated_frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-            cv2.putText(annotated_frame, f'Body {i+1}', (x, y-10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
-            
-            detection_results["bodies"].append({
-                "x": int(x), "y": int(y), "width": int(w), "height": int(h),
-                "confidence": 0.75
-            })
-        
-        # 3. MediaPipe Pose Detection
+        # MediaPipe Pose Detection - only essential parts
         try:
             pose_results = self.mp_pose.process(frame_rgb)
             if pose_results.pose_landmarks:
-                # Draw pose landmarks
+                # Calculate confidence based on essential parts only
+                confidence = self.calculate_essential_confidence(pose_results.pose_landmarks)
+                detection_results["confidence"] = confidence
+                
+                # Create custom drawing style with purple color
+                purple_rgb = (self.brand_color[2], self.brand_color[1], self.brand_color[0])  # BGR to RGB
+                purple_style = mp.solutions.drawing_styles.DrawingSpec(
+                    color=purple_rgb, thickness=2, circle_radius=3
+                )
+                purple_connections_style = mp.solutions.drawing_styles.DrawingSpec(
+                    color=purple_rgb, thickness=2
+                )
+                
+                # Draw only essential pose landmarks with purple color
                 self.mp_drawing.draw_landmarks(
                     annotated_frame,
                     pose_results.pose_landmarks,
                     self.pose_connections,
-                    landmark_drawing_spec=self.mp_drawing_styles.get_default_pose_landmarks_style()
+                    landmark_drawing_spec=purple_style,
+                    connection_drawing_spec=purple_connections_style
                 )
                 
-                # Extract key landmarks
-                landmarks = []
-                for i, landmark in enumerate(pose_results.pose_landmarks.landmark):
-                    if landmark.visibility > 0.5:  # Only visible landmarks
-                        x_px = int(landmark.x * width)
-                        y_px = int(landmark.y * height)
-                        landmarks.append({
-                            "id": i,
-                            "x": x_px,
-                            "y": y_px,
-                            "confidence": landmark.visibility,
-                            "name": self._get_landmark_name(i)
-                        })
+                # Extract only essential landmarks
+                essential_landmarks = []
+                for part_name, landmark_id in self.essential_landmarks.items():
+                    if landmark_id < len(pose_results.pose_landmarks.landmark):
+                        landmark = pose_results.pose_landmarks.landmark[landmark_id]
+                        if landmark.visibility > 0.3:  # Only visible landmarks
+                            x_px = int(landmark.x * width)
+                            y_px = int(landmark.y * height)
+                            essential_landmarks.append({
+                                "part": part_name,
+                                "x": x_px,
+                                "y": y_px,
+                                "confidence": landmark.visibility
+                            })
                 
-                detection_results["pose_landmarks"] = landmarks
+                detection_results["essential_landmarks"] = essential_landmarks
+                
         except Exception as e:
             print(f"MediaPipe pose detection error: {str(e)}")
             # Continue without pose detection if it fails
         
-        # 4. Calculate overall confidence
-        face_confidence = len(faces) * 0.25
-        body_confidence = len(bodies) * 0.4
-        pose_confidence = len(detection_results["pose_landmarks"]) * 0.01  # Each landmark adds 1%
-        
-        total_confidence = min(face_confidence + body_confidence + pose_confidence, 1.0)
-        detection_results["confidence"] = total_confidence
-        
-        # 5. Add detection quality metrics
+        # Add minimal detection quality metrics
+        gray = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2GRAY)
         brightness = np.mean(gray)
         contrast = np.std(gray)
         
         detection_results["detection_quality"] = {
             "brightness": float(brightness),
             "contrast": float(contrast),
-            "face_count": len(faces),
-            "body_count": len(bodies),
-            "landmark_count": len(detection_results["pose_landmarks"]),
-            "total_confidence": total_confidence
+            "essential_landmarks_count": len(detection_results["essential_landmarks"]),
+            "total_confidence": detection_results["confidence"]
         }
         
-        # 6. Add confidence overlay to frame
-        cv2.putText(annotated_frame, f'Confidence: {total_confidence:.1%}', 
-                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        cv2.putText(annotated_frame, f'Faces: {len(faces)}, Bodies: {len(bodies)}', 
-                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        cv2.putText(annotated_frame, f'Landmarks: {len(detection_results["pose_landmarks"])}', 
-                   (10, 85), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        # Add minimal confidence overlay to frame (purple text)
+        cv2.putText(annotated_frame, f'Confidence: {detection_results["confidence"]:.1%}', 
+                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.brand_color, 2)
+        cv2.putText(annotated_frame, f'Best: {self.best_confidence:.1%}', 
+                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, self.brand_color, 2)
         
         return detection_results
-    
-    def _deduplicate_detections(self, detections: List[Tuple], threshold: float) -> List[Tuple]:
-        """Remove duplicate detections based on overlap threshold"""
-        if not detections:
-            return []
-        
-        deduplicated = []
-        for detection in detections:
-            is_duplicate = False
-            for existing in deduplicated:
-                x1, y1, w1, h1 = detection
-                x2, y2, w2, h2 = existing
-                
-                # Calculate overlap
-                x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))
-                y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
-                overlap_area = x_overlap * y_overlap
-                
-                area1 = w1 * h1
-                area2 = w2 * h2
-                min_area = min(area1, area2)
-                
-                if overlap_area / min_area > threshold:
-                    is_duplicate = True
-                    break
-            
-            if not is_duplicate:
-                deduplicated.append(detection)
-        
-        return deduplicated
-    
-    def _get_landmark_name(self, landmark_id: int) -> str:
-        """Get human-readable name for MediaPipe landmark ID"""
-        landmark_names = {
-            0: "nose", 1: "left_eye_inner", 2: "left_eye", 3: "left_eye_outer",
-            4: "right_eye_inner", 5: "right_eye", 6: "right_eye_outer",
-            7: "left_ear", 8: "right_ear", 9: "mouth_left", 10: "mouth_right",
-            11: "left_shoulder", 12: "right_shoulder", 13: "left_elbow", 14: "right_elbow",
-            15: "left_wrist", 16: "right_wrist", 17: "left_pinky", 18: "right_pinky",
-            19: "left_index", 20: "right_index", 21: "left_thumb", 22: "right_thumb",
-            23: "left_hip", 24: "right_hip", 25: "left_knee", 26: "right_knee",
-            27: "left_ankle", 28: "right_ankle", 29: "left_heel", 30: "right_heel",
-            31: "left_foot_index", 32: "right_foot_index"
-        }
-        return landmark_names.get(landmark_id, f"landmark_{landmark_id}")
     
     def reset(self):
         """Reset detection state"""
         self.frame_count = 0
-        self.detection_history = [] 
+        self.best_confidence = 0.0
+        self.best_frame = None
+    
+    def get_best_frame(self):
+        """Get the best frame captured so far"""
+        return self.best_frame, self.best_confidence 

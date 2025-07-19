@@ -124,6 +124,11 @@ class StreamingService {
         });
 
         this.socket.on("annotated_frame", (data: AnnotatedFrameData) => {
+          console.log("📡 Received annotated frame from backend:", {
+            hasFrame: !!data.annotated_frame,
+            confidence: data.confidence,
+            frameNumber: data.frame_number,
+          });
           this.onAnnotatedFrame?.(data);
         });
 
@@ -181,14 +186,17 @@ class StreamingService {
   }
 
   setVideoElement(video: HTMLVideoElement): void {
+    console.log("🎥 Setting video element in streaming service", {
+      hasVideo: !!video,
+      videoWidth: video?.videoWidth,
+      videoHeight: video?.videoHeight,
+    });
     this.videoElement = video;
   }
 
   startFrameCapture(): void {
     if (!this.videoElement || !this.canvas || !this.ctx || !this.socket) {
-      console.error(
-        "Cannot start frame capture: missing video element or canvas"
-      );
+      console.error("❌ Cannot start frame capture: missing components");
       return;
     }
 
@@ -206,6 +214,14 @@ class StreamingService {
       }
 
       try {
+        // Simple check for video readiness
+        if (
+          this.videoElement.videoWidth === 0 ||
+          this.videoElement.videoHeight === 0
+        ) {
+          return;
+        }
+
         // Set canvas size to match video
         this.canvas.width = this.videoElement.videoWidth;
         this.canvas.height = this.videoElement.videoHeight;
@@ -228,6 +244,7 @@ class StreamingService {
       captureFrame,
       1000 / this.frameRate
     );
+    console.log("✅ Frame capture started");
   }
 
   stopFrameCapture(): void {
@@ -273,6 +290,19 @@ class StreamingService {
 
   getFrameRate(): number {
     return this.frameRate;
+  }
+
+  isReadyForFrameCapture(): boolean {
+    return !!(
+      this.videoElement &&
+      this.canvas &&
+      this.ctx &&
+      this.socket &&
+      this.isStreaming &&
+      this.videoElement.videoWidth > 0 &&
+      this.videoElement.videoHeight > 0 &&
+      this.videoElement.readyState >= 2
+    );
   }
 }
 
