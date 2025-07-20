@@ -1,8 +1,9 @@
 import { UserProfile } from './const/userprofile';
+import { RecommendationsContext } from './const/catalogue';
 
 // Base URL for the recommendations API
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-const RECOMMENDATIONS_BASE = `${API_BASE_URL}/recommendations`;
+const RECOMMENDATIONS_BASE = `${API_BASE_URL}/api/recommendations`;
 
 // Types for API responses
 export interface CatalogueItem {
@@ -14,17 +15,33 @@ export interface CatalogueItem {
   sizes_available: string[];
 }
 
+export interface RecommendationItem {
+  item: CatalogueItem;
+  reason: string;
+  score: number;
+}
+
 export interface StyleRecommendationsResponse {
   success: boolean;
   user_session_id: string;
-  recommendations: any;
+  recommendations: {
+    'final-output'?: {
+      top_10: RecommendationItem[];
+    };
+    top_10?: RecommendationItem[];
+  };
   catalogue_count: number;
   message: string;
 }
 
 export interface QuickRecommendationsResponse {
   success: boolean;
-  recommendations: any;
+  recommendations: {
+    'final-output'?: {
+      top_10: RecommendationItem[];
+    };
+    top_10?: RecommendationItem[];
+  };
   message: string;
 }
 
@@ -70,6 +87,7 @@ export interface QuickRecommendationRequest {
   fit_preferences?: string[];
   avoid_styles?: string[];
   location?: string;
+  catalogue_items?: CatalogueItem[];
 }
 
 export interface ApiError {
@@ -115,30 +133,41 @@ const apiRequest = async <T>(
 };
 
 /**
- * Get personalized style recommendations based on user profile and catalogue
+ * Get personalized style recommendations based on user profile
+ * Automatically uses the full catalogue for recommendations
  */
 export const getStyleRecommendations = async (
   userProfile: UserProfile,
-  catalogueItems: CatalogueItem[]
+  catalogueItems?: CatalogueItem[]
 ): Promise<StyleRecommendationsResponse> => {
+  // Use provided catalogue items or default to the full catalogue
+  const itemsToUse = catalogueItems || formatCatalogueItems(RecommendationsContext);
+  
   return apiRequest<StyleRecommendationsResponse>('/style-recommendations', {
     method: 'POST',
     body: JSON.stringify({
       user_profile: userProfile,
-      catalogue_items: catalogueItems,
+      catalogue_items: itemsToUse,
     }),
   });
 };
 
 /**
  * Get quick style recommendations with simplified input
+ * Automatically includes the full catalogue for recommendations
  */
 export const getQuickRecommendations = async (
   request: QuickRecommendationRequest
 ): Promise<QuickRecommendationsResponse> => {
+  // Add the full catalogue to the request
+  const requestWithCatalogue = {
+    ...request,
+    catalogue_items: formatCatalogueItems(RecommendationsContext)
+  };
+  
   return apiRequest<QuickRecommendationsResponse>('/quick-recommendations', {
     method: 'POST',
-    body: JSON.stringify(request),
+    body: JSON.stringify(requestWithCatalogue),
   });
 };
 

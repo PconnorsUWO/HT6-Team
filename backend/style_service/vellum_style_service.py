@@ -196,7 +196,29 @@ class VellumStyleService:
             if result.data.state == "REJECTED":
                 raise Exception(f"Workflow execution failed: {result.data.error.message}")
             
-            return result.data.outputs
+            # Convert Vellum outputs to JSON-serializable format
+            outputs = result.data.outputs
+            serializable_outputs = {}
+            
+            for output in outputs:
+                if hasattr(output, 'name') and hasattr(output, 'value'):
+                    # Convert the output value to a JSON-serializable format
+                    if hasattr(output.value, 'value'):
+                        # If it's a nested value object, extract the actual value
+                        serializable_outputs[output.name] = output.value.value
+                    else:
+                        # Otherwise use the value directly
+                        serializable_outputs[output.name] = output.value
+                        
+                    # If the value is still a complex object, try to convert to dict
+                    if hasattr(serializable_outputs[output.name], '__dict__'):
+                        try:
+                            serializable_outputs[output.name] = serializable_outputs[output.name].__dict__
+                        except:
+                            # If conversion fails, convert to string as fallback
+                            serializable_outputs[output.name] = str(serializable_outputs[output.name])
+            
+            return serializable_outputs
             
         except Exception as e:
             raise Exception(f"Failed to execute style workflow: {str(e)}")
