@@ -78,7 +78,8 @@ class RealtimeBodyDetector:
             frame_data: Base64 encoded image data
             
         Returns:
-            Dict containing annotated frame, detection results, and confidence scores
+            Dict containing annotated frame (for display), clean frame (for try-on), 
+            detection results, and confidence scores
         """
         try:
             # Decode base64 frame
@@ -98,10 +99,10 @@ class RealtimeBodyDetector:
             # Get essential body part detection
             detection_results = self._detect_essential_parts(frame_rgb, annotated_frame)
             
-            # Update best confidence tracking
+            # Update best confidence tracking - store the CLEAN frame (not annotated)
             if detection_results["confidence"] > self.best_confidence:
                 self.best_confidence = detection_results["confidence"]
-                self.best_frame = annotated_frame.copy()
+                self.best_frame = frame.copy()  # Store clean frame for try-on
             
             # Add frame info
             detection_results["frame_number"] = self.frame_count
@@ -111,10 +112,15 @@ class RealtimeBodyDetector:
             # Update frame counter
             self.frame_count += 1
             
-            # Encode annotated frame back to base64
+            # Encode annotated frame back to base64 (for display)
             _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
             annotated_frame_b64 = base64.b64encode(buffer).decode('utf-8')
             detection_results["annotated_frame"] = f"data:image/jpeg;base64,{annotated_frame_b64}"
+            
+            # Encode clean frame back to base64 (for try-on processing)
+            _, clean_buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            clean_frame_b64 = base64.b64encode(clean_buffer).decode('utf-8')
+            detection_results["clean_frame"] = f"data:image/jpeg;base64,{clean_frame_b64}"
             
             return detection_results
             

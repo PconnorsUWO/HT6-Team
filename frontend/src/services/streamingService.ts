@@ -27,6 +27,7 @@ export interface PoseLandmark {
 
 export interface AnnotatedFrameData {
   annotated_frame: string;
+  clean_frame: string; // Clean frame without annotations for try-on processing
   confidence: number;
   frame_number: number;
   timestamp: number;

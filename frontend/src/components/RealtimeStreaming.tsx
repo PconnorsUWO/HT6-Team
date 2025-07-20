@@ -20,6 +20,7 @@ const RealtimeStreaming: React.FC<RealtimeStreamingProps> = ({
   const [isConnected, setIsConnected] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentFrame, setCurrentFrame] = useState<string>("");
+  const [cleanFrame, setCleanFrame] = useState<string>(""); // Clean frame without annotations
   const [confidence, setConfidence] = useState(0);
   const [detectionQuality, setDetectionQuality] =
     useState<DetectionQuality | null>(null);
@@ -67,6 +68,7 @@ const RealtimeStreaming: React.FC<RealtimeStreamingProps> = ({
 
       service.setOnAnnotatedFrame((data: AnnotatedFrameData) => {
         setCurrentFrame(data.annotated_frame);
+        setCleanFrame(data.clean_frame); // Store clean frame for try-on
         setConfidence(data.confidence);
         setDetectionQuality(data.detection_quality);
         setFrameCount(data.frame_number);
@@ -151,8 +153,10 @@ const RealtimeStreaming: React.FC<RealtimeStreamingProps> = ({
 
   const selectCurrentFrame = () => {
     if (currentFrame && detectionQuality) {
-      onFrameSelected?.(currentFrame, {
+      onFrameSelected?.(cleanFrame || currentFrame, {
+        // Use clean frame if available
         annotated_frame: currentFrame,
+        clean_frame: cleanFrame || currentFrame, // Use clean frame if available
         confidence,
         frame_number: frameCount,
         timestamp: frameCount / 30.0,

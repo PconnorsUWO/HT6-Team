@@ -88,9 +88,10 @@ def create_app():
                 emit('frame_error', result)
             else:
                 print(f"✅ Frame processed successfully - Confidence: {result['confidence']:.3f}")
-                # Send annotated frame back to client
+                # Send both annotated frame (for display) and clean frame (for try-on) back to client
                 emit('annotated_frame', {
                     'annotated_frame': result['annotated_frame'],
+                    'clean_frame': result['clean_frame'],  # Clean frame without annotations for try-on
                     'confidence': result['confidence'],
                     'frame_number': result['frame_number'],
                     'timestamp': result['timestamp'],
@@ -170,7 +171,7 @@ def create_app():
     # Get best frame endpoint
     @app.route('/api/best-frame', methods=['GET'])
     def get_best_frame():
-        """Get the best frame captured during real-time detection"""
+        """Get the best frame captured during real-time detection (clean frame without annotations for try-on)"""
         try:
             best_frame, best_confidence = detector.get_best_frame()
             

@@ -20,6 +20,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
   const [isConnected, setIsConnected] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentFrame, setCurrentFrame] = useState<string>("");
+  const [cleanFrame, setCleanFrame] = useState<string>(""); // Clean frame without annotations
   const [confidence, setConfidence] = useState(0);
   const [bestConfidence, setBestConfidence] = useState(0);
   const [error, setError] = useState<string>("");
@@ -95,8 +96,10 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
 
             // Use current frame (which should be the best one)
             if (currentFrame) {
-              onFrameSelected?.(currentFrame, {
+              onFrameSelected?.(cleanFrame || currentFrame, {
+                // Use clean frame if available, fallback to annotated
                 annotated_frame: currentFrame,
+                clean_frame: cleanFrame || currentFrame, // Use clean frame if available
                 confidence,
                 frame_number: frameCount,
                 timestamp: frameCount / 30.0,
@@ -177,9 +180,11 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
           confidence: data.confidence,
           frameNumber: data.frame_number,
           hasFrame: !!data.annotated_frame,
+          hasCleanFrame: !!data.clean_frame,
         });
 
         setCurrentFrame(data.annotated_frame);
+        setCleanFrame(data.clean_frame); // Store clean frame for try-on
         setConfidence(data.confidence);
         setFrameCount(data.frame_number);
 
@@ -455,8 +460,10 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
             onClick={() => {
               stopStreaming();
               if (currentFrame) {
-                onFrameSelected?.(currentFrame, {
+                onFrameSelected?.(cleanFrame || currentFrame, {
+                  // Use clean frame if available
                   annotated_frame: currentFrame,
+                  clean_frame: cleanFrame || currentFrame, // Use clean frame if available
                   confidence,
                   frame_number: frameCount,
                   timestamp: frameCount / 30.0,
