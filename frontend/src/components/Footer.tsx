@@ -7,7 +7,7 @@ export const Footer = () => {
         <div className="grid md:grid-cols-4 gap-8 mb-8">
           <div className="col-span-2">
             <h3 className="text-2xl font-bold mb-4 flex items-center">
-              <span className="text-primary-glow">Closetly</span>.ai
+              <span className="text-primary-glow">wardrobe</span>.ai
             </h3>
             <p className="text-gray-300 mb-6 max-w-md">
               The world's most advanced AI virtual stylist. Find the perfect outfit for any occasion.
