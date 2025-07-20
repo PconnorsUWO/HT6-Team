@@ -29,7 +29,9 @@ interface TryOnResult {
   public_url: string;
   category: string;
   garment_description: string;
-  recommendations: {
+  garment_url?: string;
+  api_provider?: string;
+  recommendations?: {
     item: SelectedItem;
     reason: string;
     score: number;
@@ -129,13 +131,30 @@ const Final = () => {
         body: formData,
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          `❌ HTTP ${response.status}: ${response.statusText}`,
+          errorText
+        );
+        throw new Error(
+          `Try-on API error: ${response.status} - ${response.statusText}`
+        );
+      }
+
       const data: TryOnResult = await response.json();
+
+      console.log("📥 Try-on API response:", data);
 
       if (data.success) {
         setTryonResult(data);
         toast.success(`Try-on completed for ${itemToTryOn.name}!`);
-        console.log("✅ Try-on successful:", data);
+        console.log("✅ Try-on successful!");
+        console.log(
+          `🖼️ Result image will be served at: http://127.0.0.1:5000/${data.result_image}`
+        );
       } else {
+        console.error("❌ Try-on API returned failure:", data);
         throw new Error(data.message || "Try-on failed");
       }
     } catch (error) {
@@ -385,15 +404,39 @@ const Final = () => {
               ) : tryonResult ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                     <span className="text-sm">
                       Try-on completed successfully!
                     </span>
                   </div>
-                  <p className="text-xs text-white/70">
-                    Category: {tryonResult.category} | Result ID:{" "}
-                    {tryonResult.result_id.slice(0, 8)}...
-                  </p>
+                  <div className="space-y-1 text-xs text-white/70">
+                    <div className="flex justify-between">
+                      <span>Category:</span>
+                      <span className="capitalize">
+                        {tryonResult.category.replace("_", " ")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Provider:</span>
+                      <span className="capitalize">
+                        {tryonResult.api_provider || "segmind"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Result ID:</span>
+                      <span className="font-mono">
+                        {tryonResult.result_id.slice(0, 8)}...
+                      </span>
+                    </div>
+                    <div className="mt-2 p-2 bg-green-500/10 rounded border border-green-500/20">
+                      <div className="text-green-400 text-xs font-medium">
+                        ✓ Image ready at:
+                      </div>
+                      <div className="text-xs font-mono break-all">
+                        {tryonResult.result_image}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : userPhoto ? (
                 <div className="flex items-center gap-3">
@@ -464,17 +507,76 @@ const Final = () => {
                     </div>
                   </div>
                 ) : tryonResult ? (
-                  <img
-                    src={`http://127.0.0.1:5000/${tryonResult.result_image}`}
-                    alt="Virtual try-on result"
-                    className="w-full max-w-sm h-96 object-cover rounded-xl"
-                    onError={(e) => {
-                      console.error("Failed to load try-on result image");
-                      // Fallback to placeholder
-                      const target = e.target as HTMLImageElement;
-                      target.src = currentRecommendation.image;
-                    }}
-                  />
+                  <div className="relative">
+                    <img
+                      src={`http://127.0.0.1:5000/${tryonResult.result_image}`}
+                      alt={`Virtual try-on result for ${
+                        selectedItems[currentTryonIndex]?.name ||
+                        "selected item"
+                      }`}
+                      className="w-full max-w-sm h-96 object-cover rounded-xl"
+                      onLoad={() => {
+                        console.log(
+                          "✅ Try-on result image loaded successfully"
+                        );
+                      }}
+                      onError={(e) => {
+                        console.error(
+                          "❌ Failed to load try-on result image:",
+                          `http://127.0.0.1:5000/${tryonResult.result_image}`
+                        );
+                        console.error("Try-on result data:", tryonResult);
+                        // Show error message instead of fallback
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                        // Create error message element
+                        const errorDiv =
+                          target.parentElement?.querySelector(".image-error");
+                        if (!errorDiv) {
+                          const error = document.createElement("div");
+                          error.className =
+                            "image-error w-full h-96 flex items-center justify-center bg-red-500/20 rounded-xl border border-red-500/30";
+                          error.innerHTML = `
+                            <div class="text-center text-white">
+                              <div class="text-red-400 mb-2">Failed to load try-on result</div>
+                              <div class="text-xs text-white/70">Image path: ${tryonResult.result_image}</div>
+                              <button class="mt-2 px-3 py-1 bg-red-500/30 rounded text-xs" onclick="location.reload()">Retry</button>
+                            </div>
+                          `;
+                          target.parentElement?.appendChild(error);
+                        }
+                      }}
+                    />
+                    {/* Success indicator */}
+                    <div className="absolute top-2 right-2 bg-green-500/80 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
+                      <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></div>
+                      AI Generated
+                    </div>
+                    {/* Image info overlay */}
+                    <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+                      Result ID: {tryonResult.result_id.slice(0, 8)}...
+                    </div>
+                    {/* Download button */}
+                    <div className="absolute bottom-2 right-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="bg-black/50 text-white hover:bg-black/70 text-xs px-2 py-1 h-auto"
+                        onClick={() => {
+                          const link = document.createElement("a");
+                          link.href = `http://127.0.0.1:5000/${tryonResult.result_image}`;
+                          link.download = `tryon_result_${tryonResult.result_id.slice(
+                            0,
+                            8
+                          )}.png`;
+                          link.click();
+                          toast.success("Downloading try-on result!");
+                        }}
+                      >
+                        💾 Save
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="w-full max-w-sm h-96 flex items-center justify-center bg-white/10 rounded-xl">
                     <div className="text-center text-white">

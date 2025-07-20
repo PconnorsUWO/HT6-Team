@@ -190,12 +190,12 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
 
       if (videoDevices.length >= 2) {
         // Use the second camera (index 1)
-        videoConstraints.deviceId = { exact: videoDevices[0].deviceId };
+        videoConstraints.deviceId = { exact: videoDevices[1].deviceId };
         console.log(
           "Using second camera:",
-          videoDevices[0].label || "Camera 2"
+          videoDevices[1].label || "Camera 2"
         );
-        toast.success(`Using camera: ${videoDevices[0].label || "Camera 2"}`);
+        toast.success(`Using camera: ${videoDevices[1].label || "Camera 2"}`);
       } else if (videoDevices.length === 1) {
         // Only one camera available, try environment facing (back camera)
         videoConstraints.facingMode = "environment";

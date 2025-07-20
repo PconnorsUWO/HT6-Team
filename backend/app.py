@@ -1,7 +1,8 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from datetime import datetime
+import os
 from config import Config
 from utils import ensure_upload_folder
 from services.realtime_detection import RealtimeBodyDetector
@@ -40,6 +41,30 @@ def create_app():
     app.register_blueprint(tryon_bp, url_prefix='/api')
     app.register_blueprint(interview_bp, url_prefix='/api/interview')
     app.register_blueprint(recommendations_bp, url_prefix='/api/recommendations')
+    
+    # Route to serve uploaded files (images, etc.)
+    @app.route('/uploads/<filename>')
+    def serve_uploaded_file(filename):
+        """Serve files from the uploads directory"""
+        try:
+            return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        except FileNotFoundError:
+            return jsonify({"error": "File not found"}), 404
+    
+    # Route to serve catalog images (fallback for frontend catalog images)
+    @app.route('/catalog/<filename>')
+    def serve_catalog_image(filename):
+        """Serve catalog images from the frontend public directory"""
+        try:
+            # Try to serve from frontend public catalog directory
+            catalog_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'public', 'catalog')
+            if os.path.exists(os.path.join(catalog_path, filename)):
+                return send_from_directory(catalog_path, filename)
+            else:
+                # Return a placeholder or 404
+                return jsonify({"error": f"Catalog image not found: {filename}"}), 404
+        except FileNotFoundError:
+            return jsonify({"error": "File not found"}), 404
     
     # WebSocket event handlers
     @socketio.on('connect')
