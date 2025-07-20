@@ -1,4 +1,4 @@
-# closetly.ai 🎽
+# wardrobe.ai 🎽
 
 An AI-powered virtual clothing try-on platform that revolutionizes online fashion shopping with real-time body detection and personalized style recommendations. Built for Hack the 6ix 2025.
 
@@ -6,11 +6,11 @@ An AI-powered virtual clothing try-on platform that revolutionizes online fashio
 
 We've all been there - ordering clothes online only to find they don't fit or look nothing like expected. With fashion returns costing retailers $64 billion annually and 30-50% of online purchases being returned, we knew there had to be a better way. 
 
-What if you could see exactly how that dress looks on YOU before buying? What if trying on clothes was as easy as looking in a mirror? We created closetly.ai to transform online shopping from guesswork into confidence.
+What if you could see exactly how that dress looks on YOU before buying? What if trying on clothes was as easy as looking in a mirror? We created wardrobe.ai to transform online shopping from guesswork into confidence.
 
 ## What it does
 
-closetly.ai makes trying on clothes as simple as taking a selfie. Here's the magic:
+wardrobe.ai makes trying on clothes as simple as taking a selfie. Here's the magic:
 
 🎥 **Try Before You Buy**: Point your camera at yourself and instantly see how any piece of clothing looks on your actual body - no more guessing!
 
@@ -54,7 +54,7 @@ The entire system works together seamlessly - from the moment you open your came
 
 💾 **Handling the Load**: Managing all those videos and images without slowing down or crashing required some creative engineering solutions.
 
-Each challenge pushed us to be more creative and ultimately made closetly.ai better and more reliable for users.
+Each challenge pushed us to be more creative and ultimately made wardrobe.ai better and more reliable for users.
 
 ## Accomplishments that we're proud of
 
@@ -64,7 +64,7 @@ Each challenge pushed us to be more creative and ultimately made closetly.ai bet
 
 🎯 **Smart & Simple**: Built an AI that's smart enough to know exactly when you're in the perfect position for a try-on, but simple enough that anyone can use it without instructions.
 
-📱 **Works Everywhere**: Whether you're on your phone during lunch or your laptop at home, closetly.ai delivers the same amazing experience across every device.
+📱 **Works Everywhere**: Whether you're on your phone during lunch or your laptop at home, wardrobe.ai delivers the same amazing experience across every device.
 
 💡 **Solving Real Problems**: We're not just showing off cool technology - we're actually solving the $64 billion return problem that frustrates shoppers and hurts businesses.
 
@@ -88,7 +88,7 @@ Each challenge pushed us to be more creative and ultimately made closetly.ai bet
 
 💪 **Persistence Pays Off**: Some of our biggest breakthroughs came after our biggest frustrations. We learned that the challenge that seems impossible today might have an obvious solution tomorrow.
 
-## What's next for closetly.ai
+## What's next for wardrobe.ai
 
 🛍️ **Shopping Made Social**: Imagine trying on outfits with friends virtually, getting their opinions in real-time, and sharing your favorite looks on social media - all before buying anything.
 
