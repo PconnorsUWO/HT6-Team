@@ -22,12 +22,11 @@ def create_sample_interview_flows():
     # Define different flow templates
     flows_to_create = [
         {
-            "org_name": "Styled.ai",
+            "org_name": "wardrobe.ai",
             "title": "Get Dripped or Drowned",
             "questions": [
                 "Are the pieces we try on today for any specific ocassion",
                 "What are your style goals?",
-                "What should we avoid?",
             ],
             "interview_type": "Styling Appointment",
             "additional_info": "Get Dripped Beyond Belief"

@@ -66,6 +66,9 @@ const Final = () => {
   const [tryonResults, setTryonResults] = useState<Map<number, TryOnResult>>(
     new Map()
   );
+  const [processingItems, setProcessingItems] = useState<Set<number>>(
+    new Set()
+  );
 
   // Get state passed from previous pages
   const tryonState = location.state as TryOnState;
@@ -73,23 +76,21 @@ const Final = () => {
   const userPhoto = tryonState?.userPhoto;
   const detectionData = tryonState?.detectionData;
 
-  // Effect to handle try-on processing
+  // Effect to handle parallel try-on processing
   useEffect(() => {
     // Check if we have both selected items and user photo
     if (selectedItems.length > 0 && userPhoto) {
-      console.log("🎯 Starting try-on with captured user photo");
+      console.log("🎯 Starting parallel try-on processing");
       console.log(
         `📊 Detection confidence: ${detectionData?.confidence || "unknown"}`
       );
-      console.log(
-        `🔄 Processing item ${currentTryonIndex + 1} of ${selectedItems.length}`
-      );
-      performTryOnForSelectedItems();
+      console.log(`🔄 Processing ${selectedItems.length} items in parallel`);
+      performParallelTryOn();
     } else if (selectedItems.length > 0 && !userPhoto) {
       toast.warning("No user photo available. Please capture a photo first.");
       console.warn("⚠️ No user photo provided for try-on");
     }
-  }, [selectedItems, userPhoto, currentTryonIndex]);
+  }, [selectedItems, userPhoto]);
 
   // Effect to load cached results when switching items
   useEffect(() => {
@@ -106,6 +107,139 @@ const Final = () => {
       setTryonResult(null);
     }
   }, [currentTryonIndex, processedItems, tryonResults]);
+
+  const performParallelTryOn = async () => {
+    if (selectedItems.length === 0) {
+      toast.error("No items selected for try-on");
+      return;
+    }
+
+    // Find items that haven't been processed yet
+    const unprocessedItems = selectedItems
+      .map((item, index) => ({ item, index }))
+      .filter(({ index }) => !processedItems.has(index));
+
+    if (unprocessedItems.length === 0) {
+      console.log("✅ All items already processed");
+      return;
+    }
+
+    console.log(
+      `🚀 Starting parallel processing for ${unprocessedItems.length} items`
+    );
+    setLoading(true);
+    setProcessingItems(new Set(unprocessedItems.map(({ index }) => index)));
+
+    try {
+      // Process all unprocessed items in parallel
+      const tryOnPromises = unprocessedItems.map(({ item, index }) =>
+        performTryOnForItem(item, index)
+      );
+
+      // Wait for all try-ons to complete
+      const results = await Promise.allSettled(tryOnPromises);
+
+      // Handle results
+      results.forEach((result, arrayIndex) => {
+        const { index } = unprocessedItems[arrayIndex];
+        if (result.status === "fulfilled" && result.value) {
+          console.log(`✅ Item ${index + 1} processed successfully`);
+          setTryonResults((prev) => new Map(prev).set(index, result.value));
+          setProcessedItems((prev) => new Set([...prev, index]));
+        } else if (result.status === "rejected") {
+          console.error(`❌ Item ${index + 1} failed:`, result.reason);
+        }
+      });
+
+      // Set the first successful result as current
+      const firstSuccessfulResult = results.find(
+        (result, arrayIndex) => result.status === "fulfilled" && result.value
+      );
+      if (
+        firstSuccessfulResult &&
+        firstSuccessfulResult.status === "fulfilled"
+      ) {
+        setTryonResult(firstSuccessfulResult.value);
+      }
+
+      toast.success(
+        `Processed ${
+          results.filter((r) => r.status === "fulfilled").length
+        } items successfully!`
+      );
+    } catch (error) {
+      console.error("Parallel try-on error:", error);
+      toast.error("Some items failed to process");
+    } finally {
+      setLoading(false);
+      setProcessingItems(new Set());
+    }
+  };
+
+  const performTryOnForItem = async (
+    itemToTryOn: SelectedItem,
+    itemIndex: number
+  ): Promise<TryOnResult | null> => {
+    try {
+      if (!userPhoto) {
+        throw new Error("No user photo available for try-on");
+      }
+
+      // Convert base64 data URL to a file for upload
+      const base64Data = userPhoto.replace(/^data:image\/[a-z]+;base64,/, "");
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "image/jpeg" });
+
+      // Convert relative URL to absolute URL for the backend
+      const garmentUrl = itemToTryOn.image_url.startsWith("http")
+        ? itemToTryOn.image_url
+        : `http://localhost:8080${itemToTryOn.image_url}`;
+
+      // Prepare form data for the tryon API
+      const formData = new FormData();
+      formData.append("person_image", blob, "user_photo.jpg");
+      formData.append("garment_url", garmentUrl);
+      formData.append("garment_description", itemToTryOn.desc);
+      formData.append("user_id", "user_123"); // In production, use actual user ID
+
+      console.log(`🔄 Processing item ${itemIndex + 1}: ${itemToTryOn.name}`);
+
+      // Make the API call to the tryon endpoint
+      const response = await fetch("http://127.0.0.1:5000/api/tryon", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          `❌ HTTP ${response.status}: ${response.statusText}`,
+          errorText
+        );
+        throw new Error(
+          `Try-on API error: ${response.status} - ${response.statusText}`
+        );
+      }
+
+      const data: TryOnResult = await response.json();
+
+      if (data.success) {
+        console.log(`✅ Item ${itemIndex + 1} try-on successful!`);
+        return data;
+      } else {
+        console.error(`❌ Item ${itemIndex + 1} try-on failed:`, data);
+        throw new Error(data.message || "Try-on failed");
+      }
+    } catch (error) {
+      console.error(`Try-on error for item ${itemIndex + 1}:`, error);
+      throw error;
+    }
+  };
 
   const performTryOnForSelectedItems = async () => {
     if (selectedItems.length === 0) {
@@ -376,6 +510,12 @@ const Final = () => {
               </Button>
               <span className="px-4 py-2 bg-white/10 rounded-lg text-sm">
                 {currentTryonIndex + 1} of {selectedItems.length}
+                {processingItems.has(currentTryonIndex) && (
+                  <span className="ml-2 text-primary-glow">⏳</span>
+                )}
+                {processedItems.has(currentTryonIndex) && (
+                  <span className="ml-2 text-green-400">✅</span>
+                )}
               </span>
               <Button
                 variant="ghost"
@@ -566,13 +706,29 @@ const Final = () => {
                 }}
               >
                 {loading ? (
-                  <div className="w-full max-w-sm h-full flex items-center justify-center bg-white/10 rounded-xl">
+                  <div className="w-full h-full flex items-center justify-center bg-white/10 rounded-xl">
                     <div className="text-center text-white">
                       <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary-glow" />
-                      <p className="text-sm">Generating try-on image...</p>
+                      <p className="text-sm">
+                        {processingItems.size > 0
+                          ? `Processing ${processingItems.size} items in parallel...`
+                          : "Generating try-on image..."}
+                      </p>
                       <p className="text-xs text-white/70 mt-2">
                         This may take 30-60 seconds
                       </p>
+                      {processingItems.size > 0 && (
+                        <div className="mt-4 space-y-1">
+                          {Array.from(processingItems).map((index) => (
+                            <div
+                              key={index}
+                              className="text-xs text-primary-glow"
+                            >
+                              • {selectedItems[index]?.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : tryonResult ? (
