@@ -71,6 +71,10 @@ def get_quick_recommendations():
             if field not in data:
                 return jsonify({"error": f"Missing required field: {field}"}), 400
         
+        # Require catalogue_items to be provided from frontend
+        if 'catalogue_items' not in data or not data['catalogue_items']:
+            return jsonify({"error": "catalogue_items is required and cannot be empty"}), 400
+        
         # Create a simplified user profile
         user_data = {
             'session_id': data['session_id'],
@@ -98,33 +102,8 @@ def get_quick_recommendations():
             'weather_tags': data.get('weather_tags', [])
         }
         
-        # Use sample catalogue if not provided
-        catalogue_data = data.get('catalogue_items', [
-            {
-                "name": "Classic White Button-Down Shirt",
-                "desc": "Timeless white cotton button-down shirt, perfect for professional and casual settings",
-                "price": 79,
-                "sizes_available": ["XS", "S", "M", "L", "XL"]
-            },
-            {
-                "name": "Slim Fit Dark Jeans",
-                "desc": "Dark wash denim jeans with a modern slim fit, versatile for many occasions",
-                "price": 89,
-                "sizes_available": ["28", "30", "32", "34", "36", "38"]
-            },
-            {
-                "name": "Black Blazer",
-                "desc": "Elegant black blazer suitable for business meetings and evening events",
-                "price": 149,
-                "sizes_available": ["XS", "S", "M", "L", "XL"]
-            },
-            {
-                "name": "Comfortable Sneakers",
-                "desc": "Versatile white sneakers perfect for casual everyday wear",
-                "price": 95,
-                "sizes_available": ["7", "8", "9", "10", "11", "12"]
-            }
-        ])
+        # Use the catalogue items provided from frontend (from catalogue.ts)
+        catalogue_data = data['catalogue_items']
         
         # Create VellumStyleService instance
         service = VellumStyleService()

@@ -189,7 +189,9 @@ def virtual_tryon():
             
             save_tryon_result(result_data)
             
-            # Generate recommendations using Vellum
+            # Generate recommendations using Vellum with real catalog
+            # TODO: In production, get the real catalog from database or frontend
+            # For now, using preset garments as catalog
             try:
                 recommendations = generate_recommendations(garment_id, user_id)
             except Exception as e:

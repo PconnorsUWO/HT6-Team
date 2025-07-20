@@ -14,8 +14,8 @@ import {
   Shirt,
 } from "lucide-react";
 import { toast } from "sonner";
-import { 
-  getStyleRecommendations, 
+import {
+  getStyleRecommendations,
   getQuickRecommendations,
   createQuickRecommendationRequest,
   CatalogueItem,
@@ -23,9 +23,13 @@ import {
   StyleRecommendationsResponse,
   QuickRecommendationsResponse,
   isApiError,
-  getErrorMessage
+  getErrorMessage,
 } from "@/lib/recommendations/api";
-import { UserProfile, tedProfileData } from "@/lib/recommendations/const/userprofile";
+import {
+  UserProfile,
+  tedProfileData,
+} from "@/lib/recommendations/const/userprofile";
+import { RecommendationsContext } from "@/lib/recommendations/const/catalogue";
 
 interface RecommendationsData {
   top_10: RecommendationItem[];
@@ -55,177 +59,183 @@ const PickClothes: React.FC = () => {
     try {
       setLoading(true);
 
-      // Create sample catalogue data - in a real app, this would come from your product database
-      const sampleCatalogue: CatalogueItem[] = [
-        {
-          name: "Cooling Tech V-Neck",
-          desc: "Moisture-wicking micro-knit V-neck that resists clinging in warm commutes.",
-          price: 32,
-          category: "shirts",
-          image_url: "https://picsum.photos/seed/cooling-tech-vneck-charcoal/600/800",
-          sizes_available: ["XS", "S", "M", "L", "XL"],
-        },
-        {
-          name: "Organic Piqué Polo",
-          desc: "Classic breathable piqué with updated sleeve length for modern proportion.",
-          price: 58,
-          category: "shirts",
-          image_url: "https://picsum.photos/seed/organic-pique-navy/600/800",
-          sizes_available: ["S", "M", "L", "XL", "XXL"],
-        },
-        {
-          name: "Cooling Pima Tee",
-          desc: "Silky pima yarns and breathable knit geometry for high heat commutes.",
-          price: 34,
-          category: "shirts",
-          image_url: "https://picsum.photos/seed/cooling-pima-deepnavy/600/800",
-          sizes_available: ["XS", "S", "M", "L", "XL"],
-        },
-        {
-          name: "Performance Dress Chino",
-          desc: "Polished stretch chino with crease recovery and subtle sateen hand.",
-          price: 86,
-          category: "pants",
-          image_url: "https://picsum.photos/seed/performance-dress-chino-navy/600/800",
-          sizes_available: ["30x30", "30x32", "32x32", "34x32", "36x32", "38x32"],
-        },
-        {
-          name: "Minimal Utility Pant",
-          desc: "Streamlined utility details on a tapered 6-pocket stretch silhouette.",
-          price: 92,
-          category: "pants",
-          image_url: "https://picsum.photos/seed/minimal-utility-olive/600/800",
-          sizes_available: ["30x30", "30x32", "32x30", "32x32", "34x32"],
-        },
-        {
-          name: "Classic Oxford Shirt",
-          desc: "Premium cotton oxford with perfect collar roll and refined details.",
-          price: 68,
-          category: "shirts",
-          image_url: "https://picsum.photos/seed/classic-oxford-white/600/800",
-          sizes_available: ["S", "M", "L", "XL"],
-        },
-        {
-          name: "Stretch Denim Jean",
-          desc: "Modern fit denim with subtle stretch for all-day comfort.",
-          price: 78,
-          category: "pants",
-          image_url: "https://picsum.photos/seed/stretch-denim-dark/600/800",
-          sizes_available: ["30x30", "30x32", "32x30", "32x32", "34x30", "34x32"],
-        }
-      ];
-
-      // Use Ted's profile data as an example - in a real app, this would come from user input
+      // Use the sample user profile (Ted's profile)
       const userProfile: UserProfile = tedProfileData;
 
       try {
         // Try to get style recommendations using the full API
         // The API will automatically use the complete catalogue from RecommendationsContext
-        const response: StyleRecommendationsResponse = await getStyleRecommendations(
-          userProfile
-        );
+        const response: StyleRecommendationsResponse =
+          await getStyleRecommendations(userProfile);
 
         if (response.success && response.recommendations) {
           // Transform API response to match our component's expected format
           // Handle both nested (final-output.top_10) and direct (top_10) response structures
-          const recommendationsData = response.recommendations['final-output']?.top_10 || 
-                                     response.recommendations.top_10 || 
-                                     [];
-          
-          const formattedRecommendations: RecommendationItem[] = 
-            recommendationsData.map((rec: any) => ({
-              item: {
-                category: rec.item.category || rec.category,
-                desc: rec.item.desc || rec.desc,
-                image_url: rec.item.image_url || rec.image_url,
-                name: rec.item.name || rec.name,
-                price: rec.item.price || rec.price,
-                sizes_available: rec.item.sizes_available || rec.sizes_available || [],
-              },
-              reason: rec.reason || "Recommended based on your style preferences",
-              score: rec.score || 85,
-            })) || [];
+          const recommendationsData =
+            response.recommendations["final-output"]?.top_10 ||
+            response.recommendations.top_10 ||
+            [];
 
-          setRecommendations(formattedRecommendations);
+          const formattedRecommendations: RecommendationItem[] =
+            recommendationsData.map(
+              (rec: {
+                item?: CatalogueItem;
+                category?: string;
+                desc?: string;
+                image_url?: string;
+                name?: string;
+                price?: number;
+                sizes_available?: string[];
+                reason?: string;
+                score?: number;
+              }) => ({
+                item: {
+                  category: rec.item?.category || rec.category || "general",
+                  desc:
+                    rec.item?.desc || rec.desc || "No description available",
+                  image_url: rec.item?.image_url || rec.image_url || "",
+                  name: rec.item?.name || rec.name || "Unknown Item",
+                  price: rec.item?.price || rec.price || 0,
+                  sizes_available:
+                    rec.item?.sizes_available || rec.sizes_available || [],
+                },
+                reason:
+                  rec.reason || "Recommended based on your style preferences",
+                score: rec.score || 85,
+              })
+            ) || [];
+
+          // Sort recommendations by score/confidence (highest first)
+          const sortedRecommendations = formattedRecommendations.sort(
+            (a, b) => b.score - a.score
+          );
+          setRecommendations(sortedRecommendations);
           toast.success("Style recommendations loaded successfully!");
         } else {
           throw new Error(response.message || "Failed to get recommendations");
         }
-      } catch (apiError) {
-        console.warn("Style recommendations API failed, trying quick recommendations:", apiError);
-        
+      } catch (firstError) {
+        const apiError = firstError;
+        console.warn(
+          "Style recommendations API failed, trying quick recommendations:",
+          apiError
+        );
+
         try {
           // Fallback to quick recommendations
           const quickRequest = createQuickRecommendationRequest(userProfile);
-          const quickResponse: QuickRecommendationsResponse = await getQuickRecommendations(quickRequest);
+          const quickResponse: QuickRecommendationsResponse =
+            await getQuickRecommendations(quickRequest);
 
           if (quickResponse.success && quickResponse.recommendations) {
             // Transform quick recommendations response
             // Handle both nested (final-output.top_10) and direct (top_10) response structures
-            const recommendationsData = quickResponse.recommendations['final-output']?.top_10 || 
-                                       quickResponse.recommendations.top_10 || 
-                                       [];
-            
-            const formattedRecommendations: RecommendationItem[] = 
-              recommendationsData.map((rec: any) => ({
-                item: {
-                  category: rec.item?.category || rec.category || "general",
-                  desc: rec.item?.desc || rec.desc || "No description available",
-                  image_url: rec.item?.image_url || rec.image_url || `https://picsum.photos/seed/${rec.name}/600/800`,
-                  name: rec.item?.name || rec.name || "Unknown Item",
-                  price: rec.item?.price || rec.price || 0,
-                  sizes_available: rec.item?.sizes_available || rec.sizes_available || ["S", "M", "L"],
-                },
-                reason: rec.reason || "Recommended based on your style preferences",
-                score: rec.score || 85,
-              })) || [];
+            const recommendationsData =
+              quickResponse.recommendations["final-output"]?.top_10 ||
+              quickResponse.recommendations.top_10 ||
+              [];
 
-            setRecommendations(formattedRecommendations);
+            const formattedRecommendations: RecommendationItem[] =
+              recommendationsData.map(
+                (rec: {
+                  item?: CatalogueItem;
+                  category?: string;
+                  desc?: string;
+                  image_url?: string;
+                  name?: string;
+                  price?: number;
+                  sizes_available?: string[];
+                  reason?: string;
+                  score?: number;
+                }) => ({
+                  item: {
+                    category: rec.item?.category || rec.category || "general",
+                    desc:
+                      rec.item?.desc || rec.desc || "No description available",
+                    image_url:
+                      rec.item?.image_url ||
+                      rec.image_url ||
+                      `https://picsum.photos/seed/${rec.name}/600/800`,
+                    name: rec.item?.name || rec.name || "Unknown Item",
+                    price: rec.item?.price || rec.price || 0,
+                    sizes_available: rec.item?.sizes_available ||
+                      rec.sizes_available || ["S", "M", "L"],
+                  },
+                  reason:
+                    rec.reason || "Recommended based on your style preferences",
+                  score: rec.score || 85,
+                })
+              ) || [];
+
+            // Sort recommendations by score/confidence (highest first)
+            const sortedRecommendations = formattedRecommendations.sort(
+              (a, b) => b.score - a.score
+            );
+            setRecommendations(sortedRecommendations);
             toast.success("Quick recommendations loaded successfully!");
           } else {
-            throw new Error(quickResponse.message || "Failed to get quick recommendations");
+            throw new Error(
+              quickResponse.message || "Failed to get quick recommendations"
+            );
           }
-        } catch (quickError) {
-          console.error("Both API methods failed, using fallback data:", quickError);
-          
-          // Final fallback to dummy data with better error handling
-          const fallbackData: RecommendationItem[] = sampleCatalogue.map((item, index) => ({
-            item: {
-              category: item.category || "general",
-              desc: item.desc,
-              image_url: item.image_url || `https://picsum.photos/seed/${item.name}/600/800`,
-              name: item.name,
-              price: item.price,
-              sizes_available: item.sizes_available,
-            },
-            reason: `Recommended based on your style preferences for ${item.category || "general"}`,
-            score: 85 + (index * 2), // Vary scores slightly
-          }));
+        } catch (secondError) {
+          const quickError = secondError;
+          console.error(
+            "Both API methods failed, using fallback from catalog:",
+            quickError
+          );
 
-          setRecommendations(fallbackData);
-          toast.warning("Using sample recommendations. API connection failed.");
+          // Final fallback: use actual catalog items from RecommendationsContext
+          // Convert catalog items to recommendation format
+          const fallbackData: RecommendationItem[] =
+            RecommendationsContext.slice(0, 10).map((item, index) => ({
+              item: {
+                category: item.category || "general",
+                desc: item.desc,
+                image_url: item.image_url,
+                name: item.name,
+                price: item.price,
+                sizes_available: item.sizes_available,
+              },
+              reason: `Featured ${item.category} from our curated collection`,
+              score: 85 + index * 2, // Vary scores slightly
+            }));
+
+          // Sort fallback recommendations by score/confidence (highest first)
+          const sortedFallbackData = fallbackData.sort(
+            (a, b) => b.score - a.score
+          );
+          setRecommendations(sortedFallbackData);
+          toast.warning(
+            "Using featured items from catalog. AI recommendations unavailable."
+          );
         }
       }
     } catch (error) {
       console.error("Failed to fetch recommendations:", error);
       toast.error(`Failed to load recommendations: ${getErrorMessage(error)}`);
-      
-      // Even in case of complete failure, show some sample data
-      const fallbackData: RecommendationItem[] = [
-        {
-          item: {
-            category: "shirts",
-            desc: "Moisture-wicking micro-knit V-neck that resists clinging in warm commutes.",
-            image_url: "https://picsum.photos/seed/cooling-tech-vneck-charcoal/600/800",
-            name: "Cooling Tech V-Neck (Charcoal)",
-            price: 32,
-            sizes_available: ["XS", "S", "M", "L", "XL"],
-          },
-          reason: "Sample recommendation - API unavailable",
-          score: 85,
-        }
-      ];
-      setRecommendations(fallbackData);
+
+      // Even in case of complete failure, show some items from the actual catalog
+      const fallbackData: RecommendationItem[] = RecommendationsContext.slice(
+        0,
+        6
+      ).map((item, index) => ({
+        item: {
+          category: item.category,
+          desc: item.desc,
+          image_url: item.image_url,
+          name: item.name,
+          price: item.price,
+          sizes_available: item.sizes_available,
+        },
+        reason: "Featured item from our collection",
+        score: 80 + index,
+      }));
+      // Sort final fallback recommendations by score/confidence (highest first)
+      const sortedFinalFallbackData = fallbackData.sort(
+        (a, b) => b.score - a.score
+      );
+      setRecommendations(sortedFinalFallbackData);
     } finally {
       setLoading(false);
     }
@@ -497,7 +507,8 @@ const PickClothes: React.FC = () => {
               <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-white/50" />
               <h3 className="text-xl font-semibold mb-2">No items found</h3>
               <p className="text-white/80 mb-4">
-                No clothing items match your current filter, or there was an issue loading recommendations.
+                No clothing items match your current filter, or there was an
+                issue loading recommendations.
               </p>
               <div className="flex gap-4 justify-center">
                 <Button
