@@ -182,20 +182,32 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
 
       console.log("Available video devices:", videoDevices);
 
-      // Use second camera if available, otherwise fall back to environment camera
+      // Look for HD Pro Webcam C920 specifically
       const videoConstraints: MediaTrackConstraints = {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
+        width: { ideal: 540 },
+        height: { ideal: 960 },
       };
 
-      if (videoDevices.length >= 2) {
-        // Use the second camera (index 1)
+      // Find the HD Pro Webcam C920
+      const hdProWebcam = videoDevices.find(
+        (device) =>
+          device.label.includes("HD Pro Webcam C920") ||
+          device.label.includes("046d:08e5")
+      );
+
+      if (hdProWebcam) {
+        // Use the HD Pro Webcam C920
+        videoConstraints.deviceId = { exact: hdProWebcam.deviceId };
+        console.log("Using HD Pro Webcam C920:", hdProWebcam.label);
+        toast.success(`Using HD Pro Webcam C920`);
+      } else if (videoDevices.length >= 2) {
+        // Fallback to second camera if HD Pro Webcam not found
         videoConstraints.deviceId = { exact: videoDevices[1].deviceId };
         console.log(
-          "Using second camera:",
+          "HD Pro Webcam not found, using second camera:",
           videoDevices[1].label || "Camera 2"
         );
-        toast.success(`Using camera: ${videoDevices[1].label || "Camera 2"}`);
+        toast.info(`Using camera: ${videoDevices[1].label || "Camera 2"}`);
       } else if (videoDevices.length === 1) {
         // Only one camera available, try environment facing (back camera)
         videoConstraints.facingMode = "environment";
@@ -372,10 +384,14 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
                         <img
                           src={currentFrame}
                           alt="Real-time body detection"
-                          className="w-full h-80 object-contain"
+                          className="w-full max-w-sm h-96 object-contain mx-auto"
+                          style={{ aspectRatio: "9/16" }}
                         />
                       ) : (
-                        <div className="w-full h-80 flex items-center justify-center bg-black">
+                        <div
+                          className="w-full max-w-sm h-96 flex items-center justify-center bg-black mx-auto"
+                          style={{ aspectRatio: "9/16" }}
+                        >
                           <div className="text-white text-center">
                             <Camera className="w-16 h-16 mx-auto mb-4 opacity-50" />
                             <p className="text-lg mb-2">Camera Feed</p>
@@ -537,7 +553,8 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
                       <img
                         src={bestFrame}
                         alt="Your body profile"
-                        className="w-full max-w-md h-80 object-cover rounded-2xl mx-auto border-2 border-primary-glow/30"
+                        className="w-full max-w-sm h-96 object-cover rounded-2xl mx-auto border-2 border-primary-glow/30"
+                        style={{ aspectRatio: "9/16" }}
                       />
                     )}
                   </div>

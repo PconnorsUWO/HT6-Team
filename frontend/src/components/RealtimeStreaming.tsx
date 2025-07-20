@@ -112,20 +112,32 @@ const RealtimeStreaming: React.FC<RealtimeStreamingProps> = ({
 
       console.log("Available video devices:", videoDevices);
 
-      // Use second camera if available, otherwise fall back to environment camera
+      // Look for HD Pro Webcam C920 specifically
       const videoConstraints: MediaTrackConstraints = {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
+        width: { ideal: 540 },
+        height: { ideal: 960 },
       };
 
-      if (videoDevices.length >= 2) {
-        // Use the second camera (index 1)
+      // Find the HD Pro Webcam C920
+      const hdProWebcam = videoDevices.find(
+        (device) =>
+          device.label.includes("HD Pro Webcam C920") ||
+          device.label.includes("046d:08e5")
+      );
+
+      if (hdProWebcam) {
+        // Use the HD Pro Webcam C920
+        videoConstraints.deviceId = { exact: hdProWebcam.deviceId };
+        console.log("Using HD Pro Webcam C920:", hdProWebcam.label);
+        toast.success(`Using HD Pro Webcam C920`);
+      } else if (videoDevices.length >= 2) {
+        // Fallback to second camera if HD Pro Webcam not found
         videoConstraints.deviceId = { exact: videoDevices[1].deviceId };
         console.log(
-          "Using second camera:",
+          "HD Pro Webcam not found, using second camera:",
           videoDevices[1].label || "Camera 2"
         );
-        toast.success(`Using camera: ${videoDevices[1].label || "Camera 2"}`);
+        toast.info(`Using camera: ${videoDevices[1].label || "Camera 2"}`);
       } else if (videoDevices.length === 1) {
         // Only one camera available, try environment facing (back camera)
         videoConstraints.facingMode = "environment";
@@ -251,7 +263,8 @@ const RealtimeStreaming: React.FC<RealtimeStreamingProps> = ({
                 autoPlay
                 muted
                 playsInline
-                className="w-full h-80 object-cover"
+                className="w-full max-w-sm h-96 object-cover mx-auto"
+                style={{ aspectRatio: "9/16" }}
               />
 
               {!isStreaming && (
@@ -305,7 +318,8 @@ const RealtimeStreaming: React.FC<RealtimeStreamingProps> = ({
                   <img
                     src={currentFrame}
                     alt="Annotated frame with body detection"
-                    className="w-full h-80 object-cover"
+                    className="w-full max-w-sm h-96 object-cover mx-auto"
+                    style={{ aspectRatio: "9/16" }}
                   />
 
                   <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm backdrop-blur-sm">
@@ -325,7 +339,10 @@ const RealtimeStreaming: React.FC<RealtimeStreamingProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="w-full h-80 bg-black/30 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-white/10">
+              <div
+                className="w-full max-w-sm h-96 bg-black/30 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-white/10 mx-auto"
+                style={{ aspectRatio: "9/16" }}
+              >
                 <div className="text-white/60 text-center">
                   <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg">No detection data yet</p>

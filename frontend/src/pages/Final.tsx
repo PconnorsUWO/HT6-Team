@@ -329,7 +329,7 @@ const Final = () => {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid lg:grid-cols-3 gap-3">
           {/* Left Panel - Recommendation */}
           <div className="space-y-6">
             <Card className="p-6 bg-white/10 backdrop-blur-md border-white/20 text-white animate-scale-in">
@@ -493,11 +493,16 @@ const Final = () => {
             className="flex items-center justify-center animate-scale-in"
             style={{ animationDelay: "0.3s" }}
           >
-            <div className="relative">
+            <div className="relative w-full h-full">
               <div className="absolute inset-0 bg-gradient-primary rounded-2xl blur-xl opacity-30 scale-110"></div>
-              <Card className="relative overflow-hidden bg-white/5 backdrop-blur-sm border-white/20 p-2">
+              <Card
+                className="relative overflow-hidden bg-white/5 backdrop-blur-sm border-white/20 p-2 h-full"
+                style={{
+                  aspectRatio: "9/16",
+                }}
+              >
                 {loading ? (
-                  <div className="w-full max-w-sm h-96 flex items-center justify-center bg-white/10 rounded-xl">
+                  <div className="w-full max-w-sm h-full flex items-center justify-center bg-white/10 rounded-xl">
                     <div className="text-center text-white">
                       <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary-glow" />
                       <p className="text-sm">Generating try-on image...</p>
@@ -507,14 +512,17 @@ const Final = () => {
                     </div>
                   </div>
                 ) : tryonResult ? (
-                  <div className="relative">
+                  <div className="relative p-3 w-full h-full">
                     <img
                       src={`http://127.0.0.1:5000/${tryonResult.result_image}`}
                       alt={`Virtual try-on result for ${
                         selectedItems[currentTryonIndex]?.name ||
                         "selected item"
                       }`}
-                      className="w-full max-w-sm h-96 object-cover rounded-xl"
+                      className="w-full h-full object- rounded-xl"
+                      style={{
+                        aspectRatio: "9/16",
+                      }}
                       onLoad={() => {
                         console.log(
                           "✅ Try-on result image loaded successfully"
@@ -535,7 +543,7 @@ const Final = () => {
                         if (!errorDiv) {
                           const error = document.createElement("div");
                           error.className =
-                            "image-error w-full h-96 flex items-center justify-center bg-red-500/20 rounded-xl border border-red-500/30";
+                            "image-error w-full h-full flex items-center justify-center bg-red-500/20 rounded-xl border border-red-500/30";
                           error.innerHTML = `
                             <div class="text-center text-white">
                               <div class="text-red-400 mb-2">Failed to load try-on result</div>
@@ -578,7 +586,7 @@ const Final = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="w-full max-w-sm h-96 flex items-center justify-center bg-white/10 rounded-xl">
+                  <div className="w-full max-w-sm h-full flex items-center justify-center bg-white/10 rounded-xl">
                     <div className="text-center text-white">
                       {userPhoto ? (
                         <>

@@ -226,20 +226,32 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
 
       console.log("Available video devices:", videoDevices);
 
-      // Use second camera if available, otherwise fall back to environment camera
+      // Look for HD Pro Webcam C920 specifically
       const videoConstraints: MediaTrackConstraints = {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
+        width: { ideal: 540 },
+        height: { ideal: 960 },
       };
 
-      if (videoDevices.length >= 2) {
-        // Use the second camera (index 1)
+      // Find the HD Pro Webcam C920
+      const hdProWebcam = videoDevices.find(
+        (device) =>
+          device.label.includes("HD Pro Webcam C920") ||
+          device.label.includes("046d:08e5")
+      );
+
+      if (hdProWebcam) {
+        // Use the HD Pro Webcam C920
+        videoConstraints.deviceId = { exact: hdProWebcam.deviceId };
+        console.log("Using HD Pro Webcam C920:", hdProWebcam.label);
+        toast.success(`Using HD Pro Webcam C920`);
+      } else if (videoDevices.length >= 2) {
+        // Fallback to second camera if HD Pro Webcam not found
         videoConstraints.deviceId = { exact: videoDevices[1].deviceId };
         console.log(
-          "Using second camera:",
+          "HD Pro Webcam not found, using second camera:",
           videoDevices[1].label || "Camera 2"
         );
-        toast.success(`Using camera: ${videoDevices[1].label || "Camera 2"}`);
+        toast.info(`Using camera: ${videoDevices[1].label || "Camera 2"}`);
       } else if (videoDevices.length === 1) {
         // Only one camera available, try environment facing (back camera)
         videoConstraints.facingMode = "environment";
@@ -353,7 +365,10 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
 
   // Show only the backend annotated stream
   return (
-    <div className="relative w-full h-full flex items-center justify-center bg-black">
+    <div
+      className="relative w-full max-w-sm h-96 mx-auto flex items-center justify-center bg-black rounded-2xl overflow-hidden"
+      style={{ aspectRatio: "9/16" }}
+    >
       {/* Hidden video element for frame capture */}
       <video
         ref={videoRef}
