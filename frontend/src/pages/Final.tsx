@@ -62,6 +62,10 @@ const Final = () => {
   const [loading, setLoading] = useState(false);
   const [tryonResult, setTryonResult] = useState<TryOnResult | null>(null);
   const [currentTryonIndex, setCurrentTryonIndex] = useState(0);
+  const [processedItems, setProcessedItems] = useState<Set<number>>(new Set());
+  const [tryonResults, setTryonResults] = useState<Map<number, TryOnResult>>(
+    new Map()
+  );
 
   // Get state passed from previous pages
   const tryonState = location.state as TryOnState;
@@ -69,6 +73,7 @@ const Final = () => {
   const userPhoto = tryonState?.userPhoto;
   const detectionData = tryonState?.detectionData;
 
+  // Effect to handle try-on processing
   useEffect(() => {
     // Check if we have both selected items and user photo
     if (selectedItems.length > 0 && userPhoto) {
@@ -76,16 +81,49 @@ const Final = () => {
       console.log(
         `📊 Detection confidence: ${detectionData?.confidence || "unknown"}`
       );
+      console.log(
+        `🔄 Processing item ${currentTryonIndex + 1} of ${selectedItems.length}`
+      );
       performTryOnForSelectedItems();
     } else if (selectedItems.length > 0 && !userPhoto) {
       toast.warning("No user photo available. Please capture a photo first.");
       console.warn("⚠️ No user photo provided for try-on");
     }
-  }, [selectedItems, userPhoto]);
+  }, [selectedItems, userPhoto, currentTryonIndex]);
+
+  // Effect to load cached results when switching items
+  useEffect(() => {
+    if (processedItems.has(currentTryonIndex)) {
+      const cachedResult = tryonResults.get(currentTryonIndex);
+      if (cachedResult) {
+        console.log(
+          `📋 Loading cached result for item ${currentTryonIndex + 1}`
+        );
+        setTryonResult(cachedResult);
+      }
+    } else {
+      // Clear result if switching to unprocessed item
+      setTryonResult(null);
+    }
+  }, [currentTryonIndex, processedItems, tryonResults]);
 
   const performTryOnForSelectedItems = async () => {
     if (selectedItems.length === 0) {
       toast.error("No items selected for try-on");
+      return;
+    }
+
+    // Check if this item has already been processed
+    if (processedItems.has(currentTryonIndex)) {
+      console.log(
+        `🔄 Item ${
+          currentTryonIndex + 1
+        } already processed, loading cached result`
+      );
+      const cachedResult = tryonResults.get(currentTryonIndex);
+      if (cachedResult) {
+        setTryonResult(cachedResult);
+      }
       return;
     }
 
@@ -148,6 +186,9 @@ const Final = () => {
 
       if (data.success) {
         setTryonResult(data);
+        // Mark this item as processed and store the result
+        setProcessedItems((prev) => new Set([...prev, currentTryonIndex]));
+        setTryonResults((prev) => new Map(prev).set(currentTryonIndex, data));
         toast.success(`Try-on completed for ${itemToTryOn.name}!`);
         console.log("✅ Try-on successful!");
         console.log(
@@ -175,16 +216,14 @@ const Final = () => {
   const tryNextItem = () => {
     if (currentTryonIndex < selectedItems.length - 1) {
       setCurrentTryonIndex((prev) => prev + 1);
-      setTryonResult(null); // Clear current result
-      performTryOnForSelectedItems(); // Try on next item
+      // useEffect will handle loading cached result or triggering new try-on
     }
   };
 
   const tryPreviousItem = () => {
     if (currentTryonIndex > 0) {
       setCurrentTryonIndex((prev) => prev - 1);
-      setTryonResult(null); // Clear current result
-      performTryOnForSelectedItems(); // Try on previous item
+      // useEffect will handle loading cached result or triggering new try-on
     }
   };
 
@@ -265,9 +304,12 @@ const Final = () => {
 
   // Add useEffect to start the live camera preview
   useEffect(() => {
-    const video = document.getElementById("livePreviewVideo") as HTMLVideoElement | null;
+    const video = document.getElementById(
+      "livePreviewVideo"
+    ) as HTMLVideoElement | null;
     if (video) {
-      navigator.mediaDevices.getUserMedia({ video: { aspectRatio: 9 / 16 } })
+      navigator.mediaDevices
+        .getUserMedia({ video: { aspectRatio: 9 / 16 } })
         .then((stream) => {
           video.srcObject = stream;
           video.play();
@@ -657,13 +699,16 @@ const Final = () => {
             style={{ animationDelay: "0.4s" }}
           >
             <div className="relative p-3 w-full h-full">
-              <div className="relative bg-black rounded-2xl overflow-hidden mb-4 w-full h-full" style={{ aspectRatio: '9/16' }}>
+              <div
+                className="relative bg-black rounded-2xl overflow-hidden mb-4 w-full h-full"
+                style={{ aspectRatio: "9/16" }}
+              >
                 <video
                   autoPlay
                   muted
                   playsInline
                   className="w-full h-full object-contain rounded-2xl"
-                  style={{ aspectRatio: '9/16' }}
+                  style={{ aspectRatio: "9/16" }}
                   id="livePreviewVideo"
                 />
                 <div className="absolute top-4 left-4">
