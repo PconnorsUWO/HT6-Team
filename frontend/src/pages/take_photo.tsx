@@ -276,8 +276,8 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
 
   const proceedToNextStep = () => {
     // Here you could pass the best frame data to the next page
-    // For now, just navigate to take_photo
-    navigate("/take_photo");
+    // Navigate to clothing recommendations
+    navigate("/pick_clothes");
   };
 
   return (
