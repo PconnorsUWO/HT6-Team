@@ -121,7 +121,8 @@ def create_app():
                     'frame_number': result['frame_number'],
                     'timestamp': result['timestamp'],
                     'detection_quality': result['detection_quality'],
-                    'essential_landmarks': result['essential_landmarks']
+                    'essential_landmarks': result['essential_landmarks'],
+                    'full_body_validation': result.get('full_body_validation')
                 })
                 
         except Exception as e:

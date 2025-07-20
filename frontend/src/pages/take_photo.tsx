@@ -34,6 +34,33 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
   const [isAutoStopping, setIsAutoStopping] = useState(false);
   const [bestFrame, setBestFrame] = useState<string>("");
   const [detectionComplete, setDetectionComplete] = useState(false);
+  const [fullBodyValidation, setFullBodyValidation] = useState<{
+    is_valid: boolean;
+    confidence: number;
+    missing_parts: string[];
+    feedback: string;
+    body_coverage: number;
+    region_coverage: {
+      head: number;
+      torso: number;
+      arms: number;
+      legs: number;
+    };
+    positioning_score: number;
+    visible_landmarks: Record<
+      string,
+      {
+        x: number;
+        y: number;
+        visibility: number;
+      }
+    >;
+  } | null>(null);
+
+  // Auto-capture timer state
+  const [autoCaptureTimer, setAutoCaptureTimer] = useState<number | null>(null);
+  const [isAutoCapturing, setIsAutoCapturing] = useState(false);
+  const autoCaptureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Confidence tracking for auto-stop
   const [confidenceHistory, setConfidenceHistory] = useState<number[]>([]);
@@ -57,61 +84,81 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
     };
   }, []);
 
-  // Confidence tracking with auto-stop
+  // Auto-capture timer effect
+  useEffect(() => {
+    // Clear any existing timer
+    if (autoCaptureTimeoutRef.current) {
+      clearTimeout(autoCaptureTimeoutRef.current);
+      autoCaptureTimeoutRef.current = null;
+    }
+
+    // Start auto-capture timer when validation becomes valid
+    if (
+      fullBodyValidation?.is_valid &&
+      confidence >= confidenceThreshold &&
+      isStreaming &&
+      !detectionComplete &&
+      !isAutoStopping &&
+      !isAutoCapturing
+    ) {
+      console.log(
+        "🎯 Full body validation passed, starting 2-second auto-capture timer"
+      );
+      setIsAutoCapturing(true);
+      setAutoCaptureTimer(2);
+
+      // Countdown timer
+      const countdown = setInterval(() => {
+        setAutoCaptureTimer((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(countdown);
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Auto-capture after 2 seconds
+      autoCaptureTimeoutRef.current = setTimeout(() => {
+        // Double-check validation before capturing
+        if (
+          fullBodyValidation?.is_valid &&
+          confidence >= confidenceThreshold &&
+          isStreaming &&
+          !detectionComplete
+        ) {
+          console.log("📸 Auto-capturing photo after 2-second timer");
+          stopStreamingAndCapture();
+        } else {
+          console.log("❌ Validation failed during timer, not capturing");
+          setIsAutoCapturing(false);
+        }
+        clearInterval(countdown);
+      }, 2000);
+    } else if (
+      !fullBodyValidation?.is_valid ||
+      confidence < confidenceThreshold
+    ) {
+      // Reset timer if validation fails
+      setIsAutoCapturing(false);
+      setAutoCaptureTimer(null);
+    }
+  }, [
+    fullBodyValidation?.is_valid,
+    confidence,
+    confidenceThreshold,
+    isStreaming,
+    detectionComplete,
+    isAutoStopping,
+  ]);
+
+  // Confidence tracking (simplified - just for history)
   useEffect(() => {
     setConfidenceHistory((prev) => {
       const newHistory = [...prev, confidence];
       return newHistory.slice(-60); // Keep last 60 frames (4 seconds at 15fps)
     });
-
-    if (
-      confidence >= confidenceThreshold &&
-      !isAutoStopping &&
-      isStreaming &&
-      !detectionComplete
-    ) {
-      const now = Date.now();
-
-      if (!highConfidenceStartTime) {
-        setHighConfidenceStartTime(now);
-        console.log(
-          `🎯 High confidence started: ${confidence.toFixed(
-            3
-          )} >= ${confidenceThreshold}`
-        );
-      } else {
-        const duration = now - highConfidenceStartTime;
-        if (duration >= requiredSustainedTime && !sustainedHighConfidence) {
-          console.log(
-            `✅ Sustained high confidence for ${duration}ms, auto-stopping`
-          );
-          setSustainedHighConfidence(true);
-          setIsAutoStopping(true);
-
-          autoStopTimeoutRef.current = setTimeout(() => {
-            stopStreamingAndCapture();
-          }, 1000);
-        }
-      }
-    } else {
-      if (highConfidenceStartTime && !sustainedHighConfidence) {
-        console.log(
-          `📉 Confidence dropped: ${confidence.toFixed(
-            3
-          )} < ${confidenceThreshold}`
-        );
-        setHighConfidenceStartTime(null);
-      }
-    }
-  }, [
-    confidence,
-    confidenceThreshold,
-    isAutoStopping,
-    isStreaming,
-    highConfidenceStartTime,
-    sustainedHighConfidence,
-    detectionComplete,
-  ]);
+  }, [confidence]);
 
   const initializeStreamingService = async () => {
     try {
@@ -148,9 +195,13 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
         setConfidence(data.confidence);
         setDetectionQuality(data.detection_quality);
         setFrameCount(data.frame_number);
+        setFullBodyValidation(data.full_body_validation);
 
-        // Update best frame if this is better
-        if (data.confidence > confidence) {
+        // Update best frame if this is better and has full body validation
+        if (
+          data.confidence > confidence &&
+          data.full_body_validation?.is_valid
+        ) {
           setBestFrame(data.clean_frame || data.annotated_frame);
         }
       });
@@ -254,6 +305,11 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
         autoStopTimeoutRef.current = null;
       }
 
+      if (autoCaptureTimeoutRef.current) {
+        clearTimeout(autoCaptureTimeoutRef.current);
+        autoCaptureTimeoutRef.current = null;
+      }
+
       streamingServiceRef.current?.stopStream();
 
       if (streamRef.current) {
@@ -270,6 +326,8 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
       if (finalFrame) {
         setBestFrame(finalFrame);
         setDetectionComplete(true);
+        setIsAutoCapturing(false);
+        setAutoCaptureTimer(null);
         toast.success("Perfect pose captured! Ready for style analysis.");
       }
     } catch (err) {
@@ -281,6 +339,9 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
   const cleanup = () => {
     if (autoStopTimeoutRef.current) {
       clearTimeout(autoStopTimeoutRef.current);
+    }
+    if (autoCaptureTimeoutRef.current) {
+      clearTimeout(autoCaptureTimeoutRef.current);
     }
     stopStreamingAndCapture();
     streamingServiceRef.current?.disconnect();
@@ -415,6 +476,13 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
                           ✨ Perfect pose detected! Capturing...
                         </div>
                       )}
+
+                      {/* Auto-capture countdown timer */}
+                      {isAutoCapturing && autoCaptureTimer !== null && (
+                        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-primary/80 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm">
+                          ✨ Great pose! Hold steady... {autoCaptureTimer}
+                        </div>
+                      )}
                     </div>
 
                     {/* Control Buttons */}
@@ -472,6 +540,98 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
                       </p>
                     </div>
 
+                    {/* Full Body Validation */}
+                    {fullBodyValidation && (
+                      <div className="bg-white/10 rounded-xl p-6 backdrop-blur-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-white font-medium">
+                            Full Body Validation
+                          </span>
+                          <span
+                            className={`font-bold ${
+                              fullBodyValidation.is_valid
+                                ? "text-green-400"
+                                : "text-red-400"
+                            }`}
+                          >
+                            {fullBodyValidation.is_valid
+                              ? "✓ Valid"
+                              : "✗ Invalid"}
+                          </span>
+                        </div>
+
+                        {/* Distance Warning */}
+                        {!fullBodyValidation.is_valid && (
+                          <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 mb-4">
+                            <div className="flex items-center gap-2 text-red-300 font-medium mb-1">
+                              <span>⚠️</span>
+                              <span>Distance Required</span>
+                            </div>
+                            <p className="text-sm text-red-200">
+                              You must be 8-12 feet from the camera to capture
+                              your entire body (head to feet).
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Body Coverage */}
+                        <div className="mb-4">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-white/70">Body Coverage</span>
+                            <span className="text-white">
+                              {(fullBodyValidation.body_coverage * 100).toFixed(
+                                0
+                              )}
+                              %
+                            </span>
+                          </div>
+                          <div className="w-full bg-black/30 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full transition-all duration-300 ${
+                                fullBodyValidation.body_coverage >= 0.7
+                                  ? "bg-green-500"
+                                  : "bg-red-500"
+                              }`}
+                              style={{
+                                width: `${
+                                  fullBodyValidation.body_coverage * 100
+                                }%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Region Coverage */}
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                          {Object.entries(
+                            fullBodyValidation.region_coverage
+                          ).map(([region, coverage]) => (
+                            <div key={region} className="text-center">
+                              <div className="text-sm text-white/70 capitalize">
+                                {region}
+                              </div>
+                              <div
+                                className={`text-lg font-bold ${
+                                  coverage >= 0.5
+                                    ? "text-green-400"
+                                    : "text-red-400"
+                                }`}
+                              >
+                                {(coverage * 100).toFixed(0)}%
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Feedback */}
+                        <div className="bg-black/20 rounded-lg p-3">
+                          <p className="text-sm text-white/90 leading-relaxed">
+                            {fullBodyValidation.feedback}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Detection Quality Stats */}
                     {detectionQuality && (
                       <div className="grid grid-cols-2 gap-4">
@@ -512,11 +672,19 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
                       <ul className="space-y-2 text-sm text-white/80">
                         <li className="flex items-center gap-2">
                           <CheckCircle className="w-4 h-4 text-green-400" />
-                          Stand facing the camera directly
+                          Stand 8-12 feet from camera for full body view
                         </li>
                         <li className="flex items-center gap-2">
                           <CheckCircle className="w-4 h-4 text-green-400" />
-                          Ensure good lighting on your face and body
+                          Ensure your entire body is visible (head to feet)
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                          Center yourself in the frame
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                          Ensure good lighting on your entire body
                         </li>
                         <li className="flex items-center gap-2">
                           <CheckCircle className="w-4 h-4 text-green-400" />
@@ -553,7 +721,7 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
                       <img
                         src={bestFrame}
                         alt="Your body profile"
-                        className="w-full max-w-sm h-96 object-cover rounded-2xl mx-auto border-2 border-primary-glow/30"
+                        className="w-full max-w-sm rounded-2xl mx-auto border-2 border-primary-glow/30"
                         style={{ aspectRatio: "9/16" }}
                       />
                     )}

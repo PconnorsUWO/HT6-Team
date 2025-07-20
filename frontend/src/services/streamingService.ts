@@ -7,6 +7,30 @@ export interface DetectionQuality {
   body_count: number;
   landmark_count: number;
   total_confidence: number;
+  essential_landmarks_count?: number;
+}
+
+export interface FullBodyValidation {
+  is_valid: boolean;
+  confidence: number;
+  missing_parts: string[];
+  feedback: string;
+  body_coverage: number;
+  region_coverage: {
+    head: number;
+    torso: number;
+    arms: number;
+    legs: number;
+  };
+  positioning_score: number;
+  visible_landmarks: Record<
+    string,
+    {
+      x: number;
+      y: number;
+      visibility: number;
+    }
+  >;
 }
 
 export interface BodyPart {
@@ -36,6 +60,7 @@ export interface AnnotatedFrameData {
   bodies: BodyPart[];
   eyes: BodyPart[];
   pose_landmarks: PoseLandmark[];
+  full_body_validation?: FullBodyValidation;
 }
 
 export interface StreamConfig {

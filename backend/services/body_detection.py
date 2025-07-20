@@ -80,6 +80,135 @@ def calculate_detection_quality(frame, faces, bodies):
     
     return min(quality_score, 1.0)
 
+def validate_full_body_visibility_opencv(frame, faces, bodies):
+    """Validate that the entire body is visible using OpenCV detections"""
+    height, width = frame.shape[:2]
+    
+    # Check if we have both face and body detections
+    has_face = len(faces) > 0
+    has_body = len(bodies) > 0
+    
+    if not has_face or not has_body:
+        return {
+            "is_valid": False,
+            "confidence": 0.0,
+            "missing_parts": ["face" if not has_face else "", "body" if not has_body else ""],
+            "feedback": "Missing face or body detection",
+            "body_coverage": 0.0,
+            "region_coverage": {"head": 0.0, "torso": 0.0, "arms": 0.0, "legs": 0.0},
+            "positioning_score": 0.0
+        }
+    
+    # Get the largest face and body detections
+    largest_face = max(faces, key=lambda f: f[2] * f[3]) if faces else None
+    largest_body = max(bodies, key=lambda b: b[2] * b[3]) if bodies else None
+    
+    if not largest_face or not largest_body:
+        return {
+            "is_valid": False,
+            "confidence": 0.0,
+            "missing_parts": ["face", "body"],
+            "feedback": "No valid face or body detection",
+            "body_coverage": 0.0,
+            "region_coverage": {"head": 0.0, "torso": 0.0, "arms": 0.0, "legs": 0.0},
+            "positioning_score": 0.0
+        }
+    
+    fx, fy, fw, fh = largest_face
+    bx, by, bw, bh = largest_body
+    
+    # Calculate body coverage (how much of the frame the body occupies)
+    body_area = bw * bh
+    frame_area = width * height
+    body_coverage = body_area / frame_area
+    
+    # Check if body is properly sized (should be between 20% and 60% of frame)
+    if 0.2 <= body_coverage <= 0.6:
+        size_score = 1.0
+    elif 0.15 <= body_coverage <= 0.7:
+        size_score = 0.7
+    else:
+        size_score = 0.3
+    
+    # Check body positioning (should be centered and not cut off)
+    body_center_x = bx + bw/2
+    body_center_y = by + bh/2
+    
+    # Horizontal centering (within 20% of center)
+    horizontal_centering = 1.0 - min(abs(body_center_x/width - 0.5) / 0.2, 1.0)
+    
+    # Check if body is not cut off at top or bottom
+    margin_score = 1.0
+    if by < height * 0.05:  # Too close to top
+        margin_score -= 0.3
+    if by + bh > height * 0.95:  # Too close to bottom
+        margin_score -= 0.3
+    
+    # Check aspect ratio (body should be taller than wide)
+    aspect_ratio = bh / bw if bw > 0 else 0
+    if 1.5 <= aspect_ratio <= 3.0:
+        aspect_score = 1.0
+    elif 1.2 <= aspect_ratio <= 4.0:
+        aspect_score = 0.7
+    else:
+        aspect_score = 0.3
+    
+    # Calculate positioning score
+    positioning_score = (
+        horizontal_centering * 0.3 +
+        size_score * 0.3 +
+        margin_score * 0.2 +
+        aspect_score * 0.2
+    )
+    
+    # Estimate region coverage based on body detection
+    # This is a simplified estimation since OpenCV doesn't provide detailed landmarks
+    region_coverage = {
+        "head": 1.0 if has_face else 0.0,
+        "torso": 0.8 if has_body else 0.0,  # Assume torso is mostly visible if body detected
+        "arms": 0.6 if has_body else 0.0,   # Assume arms are partially visible
+        "legs": 0.7 if has_body else 0.0    # Assume legs are mostly visible
+    }
+    
+    # Calculate overall validation score
+    validation_score = (
+        body_coverage * 0.4 +
+        positioning_score * 0.4 +
+        min(region_coverage.values()) * 0.2
+    )
+    
+    # Determine if validation passes
+    is_valid = (
+        body_coverage >= 0.2 and           # At least 20% of frame covered by body
+        positioning_score >= 0.6 and       # Good positioning
+        has_face and has_body and          # Both face and body detected
+        min(region_coverage.values()) >= 0.5  # At least 50% of each region estimated visible
+    )
+    
+    # Generate feedback
+    feedback_parts = []
+    if not is_valid:
+        if body_coverage < 0.2:
+            feedback_parts.append("Move closer to camera for full body view")
+        if positioning_score < 0.6:
+            feedback_parts.append("Center yourself in the frame")
+        if not has_face:
+            feedback_parts.append("Ensure your face is visible")
+        if not has_body:
+            feedback_parts.append("Ensure your entire body is visible")
+    
+    feedback = " • ".join(feedback_parts) if feedback_parts else "Perfect! Your entire body is visible and well-positioned."
+    
+    return {
+        "is_valid": is_valid,
+        "confidence": validation_score,
+        "missing_parts": [] if has_face and has_body else ["face" if not has_face else "", "body" if not has_body else ""],
+        "feedback": feedback,
+        "body_coverage": body_coverage,
+        "region_coverage": region_coverage,
+        "positioning_score": positioning_score
+    }
+
 def detect_body_pose_in_video(video_path: str) -> dict:
     """
     Detect body pose in video using OpenCV with STRICT detection criteria
@@ -188,6 +317,9 @@ def detect_body_pose_in_video(video_path: str) -> dict:
             # Additional quality checks
             quality_score = calculate_detection_quality(frame, faces, bodies)
             
+            # Full body validation
+            full_body_validation = validate_full_body_visibility_opencv(frame, faces, bodies)
+            
             # Calculate frame quality metrics
             brightness = np.mean(gray)
             contrast = np.std(gray)
@@ -216,8 +348,10 @@ def detect_body_pose_in_video(video_path: str) -> dict:
                 contrast_confidence       # Contrast (10% weight)
             )
             
-            # MUCH STRICTER threshold - require 70% confidence minimum
-            if final_confidence > best_confidence and final_confidence >= 0.7:
+            # MUCH STRICTER threshold - require 70% confidence minimum AND full body validation
+            if (final_confidence > best_confidence and 
+                final_confidence >= 0.7 and 
+                full_body_validation["is_valid"]):
                 best_confidence = final_confidence
                 best_frame = frame.copy()
                 best_frame_number = processed_frames
@@ -236,7 +370,8 @@ def detect_body_pose_in_video(video_path: str) -> dict:
                         "total_confidence": final_confidence,
                         "brightness": brightness,
                         "contrast": contrast
-                    }
+                    },
+                    "full_body_validation": full_body_validation
                 }
                 
                 # Draw face annotations with confidence
