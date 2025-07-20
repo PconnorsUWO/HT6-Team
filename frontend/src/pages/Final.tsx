@@ -263,6 +263,28 @@ const Final = () => {
     );
   };
 
+  // Add useEffect to start the live camera preview
+  useEffect(() => {
+    const video = document.getElementById("livePreviewVideo") as HTMLVideoElement | null;
+    if (video) {
+      navigator.mediaDevices.getUserMedia({ video: { aspectRatio: 9 / 16 } })
+        .then((stream) => {
+          video.srcObject = stream;
+          video.play();
+        })
+        .catch((err) => {
+          console.error("Failed to start live camera preview", err);
+        });
+    }
+    return () => {
+      if (video && video.srcObject) {
+        const tracks = (video.srcObject as MediaStream).getTracks();
+        tracks.forEach((track) => track.stop());
+        video.srcObject = null;
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-background relative overflow-hidden">
       {/* Animated background elements */}
@@ -629,68 +651,27 @@ const Final = () => {
             </div>
           </div>
 
-          {/* Right Panel - Alternative Items */}
+          {/* Right Panel - Live Camera Preview */}
           <div
-            className="space-y-4 animate-slide-in-right"
+            className="flex items-center justify-center animate-slide-in-right"
             style={{ animationDelay: "0.4s" }}
           >
-            <div className="text-white mb-4">
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Alternative{" "}
-                {categories.find((c) => c.id === currentCategory)?.label}
-              </h3>
-            </div>
-
-            <div className="space-y-3">
-              {currentAlternatives.map((item, index) => (
-                <Card
-                  key={index}
-                  className="p-4 bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/15 transition-all duration-300 cursor-pointer group hover:scale-105"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{item.name}</p>
-                      <p className="text-xs text-white/70">{item.color}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-sm">{item.price}</p>
-                      <p className="text-xs text-primary-glow">
-                        {item.match} match
-                      </p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </Card>
-              ))}
-            </div>
-
-            <Button variant="glass" className="w-full mt-6">
-              View More Options
-            </Button>
-          </div>
-        </div>
-
-        {/* Category Navigation - Bottom */}
-        <div
-          className="mt-12 animate-slide-in-right"
-          style={{ animationDelay: "0.5s" }}
-        >
-          <div className="flex justify-center">
-            <div className="grid grid-cols-4 gap-4 max-w-md">
-              {categories.map((category) => (
-                <Button
-                  key={category.id}
-                  variant={
-                    currentCategory === category.id ? "glass" : "category"
-                  }
-                  onClick={() => setCurrentCategory(category.id)}
-                  className="h-20 flex-col gap-2 text-white"
-                >
-                  <span className="text-2xl">{category.icon}</span>
-                  <span className="text-xs">{category.label}</span>
-                </Button>
-              ))}
+            <div className="relative p-3 w-full h-full">
+              <div className="relative bg-black rounded-2xl overflow-hidden mb-4 w-full h-full" style={{ aspectRatio: '9/16' }}>
+                <video
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-contain rounded-2xl"
+                  style={{ aspectRatio: '9/16' }}
+                  id="livePreviewVideo"
+                />
+                <div className="absolute top-4 left-4">
+                  <span className="px-3 py-1 bg-black/50 backdrop-blur-sm text-white text-xs rounded-full">
+                    Live Preview
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

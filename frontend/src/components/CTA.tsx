@@ -25,8 +25,8 @@ export const CTA = () => {
             <span className="block text-primary-glow">Your Style?</span>
           </h2>
           
-          <p className="text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
-            Join thousands of fashion-forward individuals who have revolutionized their wardrobes with Closetly.ai
+          <p className="text-xl text-black-200 mb-8 max-w-2xl mx-auto">
+            Join thousands of fashion-forward individuals who have revolutionized their style with wardrobe.ai
           </p>
         </div>
       </div>

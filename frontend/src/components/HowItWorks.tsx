@@ -36,7 +36,7 @@ export const HowItWorks = () => {
             How It <span className="text-primary">Works</span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Closetly will transform your style experience in just three simple steps with our cutting-edge AI technology
+            wardrobe.ai will transform your style experience in just three simple steps with our cutting-edge AI technology
           </p>
         </div>
         
