@@ -13,6 +13,10 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
+# Import config to get API keys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import Config
+
 # Import from the vellum-ai package
 try:
     from vellum import Vellum
@@ -70,12 +74,12 @@ class VellumStyleService:
         Initialize the Vellum Style Service
         
         Args:
-            api_key: Vellum API key. If not provided, will use VELLUM_API_KEY env var
+            api_key: Vellum API key. If not provided, will use config VELLUM_API_KEY
         """
         if not VELLUM_AVAILABLE:
             raise ValueError("Vellum AI package is not available. Please install vellum-ai.")
             
-        self.api_key = api_key or os.environ.get("VELLUM_API_KEY")
+        self.api_key = api_key or Config.VELLUM_API_KEY
         if not self.api_key:
             raise ValueError("VELLUM_API_KEY must be provided or set in environment variables")
         

@@ -1,8 +1,8 @@
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from root .env file
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 class Config:
     """Application configuration"""
@@ -13,6 +13,7 @@ class Config:
     
     # API Keys
     VELLUM_API_KEY = os.getenv('VELLUM_API_KEY')
+    RIBBON_API_KEY = os.getenv('RIBBON_API_KEY')
     
     # MongoDB settings
     MONGODB_URI = os.getenv('MONGODB_URI')
