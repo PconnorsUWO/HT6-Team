@@ -14,21 +14,18 @@ import {
   Shirt,
 } from "lucide-react";
 import { toast } from "sonner";
-
-interface ClothingItem {
-  category: string;
-  desc: string;
-  image_url: string;
-  name: string;
-  price: number;
-  sizes_available: string[];
-}
-
-interface RecommendationItem {
-  item: ClothingItem;
-  reason: string;
-  score: number;
-}
+import { 
+  getStyleRecommendations, 
+  getQuickRecommendations,
+  createQuickRecommendationRequest,
+  CatalogueItem,
+  RecommendationItem,
+  StyleRecommendationsResponse,
+  QuickRecommendationsResponse,
+  isApiError,
+  getErrorMessage
+} from "@/lib/recommendations/api";
+import { UserProfile, tedProfileData } from "@/lib/recommendations/const/userprofile";
 
 interface RecommendationsData {
   top_10: RecommendationItem[];
@@ -42,106 +39,193 @@ const PickClothes: React.FC = () => {
   );
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     fetchRecommendations();
   }, []);
 
+  const retryFetchRecommendations = async () => {
+    setIsRetrying(true);
+    await fetchRecommendations();
+    setIsRetrying(false);
+  };
+
   const fetchRecommendations = async () => {
     try {
       setLoading(true);
 
-      // Simulate API call with dummy data for now
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Create sample catalogue data - in a real app, this would come from your product database
+      const sampleCatalogue: CatalogueItem[] = [
+        {
+          name: "Cooling Tech V-Neck",
+          desc: "Moisture-wicking micro-knit V-neck that resists clinging in warm commutes.",
+          price: 32,
+          category: "shirts",
+          image_url: "https://picsum.photos/seed/cooling-tech-vneck-charcoal/600/800",
+          sizes_available: ["XS", "S", "M", "L", "XL"],
+        },
+        {
+          name: "Organic Piqué Polo",
+          desc: "Classic breathable piqué with updated sleeve length for modern proportion.",
+          price: 58,
+          category: "shirts",
+          image_url: "https://picsum.photos/seed/organic-pique-navy/600/800",
+          sizes_available: ["S", "M", "L", "XL", "XXL"],
+        },
+        {
+          name: "Cooling Pima Tee",
+          desc: "Silky pima yarns and breathable knit geometry for high heat commutes.",
+          price: 34,
+          category: "shirts",
+          image_url: "https://picsum.photos/seed/cooling-pima-deepnavy/600/800",
+          sizes_available: ["XS", "S", "M", "L", "XL"],
+        },
+        {
+          name: "Performance Dress Chino",
+          desc: "Polished stretch chino with crease recovery and subtle sateen hand.",
+          price: 86,
+          category: "pants",
+          image_url: "https://picsum.photos/seed/performance-dress-chino-navy/600/800",
+          sizes_available: ["30x30", "30x32", "32x32", "34x32", "36x32", "38x32"],
+        },
+        {
+          name: "Minimal Utility Pant",
+          desc: "Streamlined utility details on a tapered 6-pocket stretch silhouette.",
+          price: 92,
+          category: "pants",
+          image_url: "https://picsum.photos/seed/minimal-utility-olive/600/800",
+          sizes_available: ["30x30", "30x32", "32x30", "32x32", "34x32"],
+        },
+        {
+          name: "Classic Oxford Shirt",
+          desc: "Premium cotton oxford with perfect collar roll and refined details.",
+          price: 68,
+          category: "shirts",
+          image_url: "https://picsum.photos/seed/classic-oxford-white/600/800",
+          sizes_available: ["S", "M", "L", "XL"],
+        },
+        {
+          name: "Stretch Denim Jean",
+          desc: "Modern fit denim with subtle stretch for all-day comfort.",
+          price: 78,
+          category: "pants",
+          image_url: "https://picsum.photos/seed/stretch-denim-dark/600/800",
+          sizes_available: ["30x30", "30x32", "32x30", "32x32", "34x30", "34x32"],
+        }
+      ];
 
-      // Dummy data matching the user's provided structure
-      const dummyData: RecommendationsData = {
-        top_10: [
-          {
-            item: {
-              category: "shirts",
-              desc: "Moisture-wicking micro-knit V-neck that resists clinging in warm commutes.",
-              image_url:
-                "https://picsum.photos/seed/cooling-tech-vneck-charcoal/600/800",
-              name: "Cooling Tech V-Neck (Charcoal)",
-              price: 32,
-              sizes_available: ["XS", "S", "M", "L", "XL"],
-            },
-            reason:
-              "The charcoal color, v-neck style, and moisture-wicking fabric suit Ted's preferences and the warm weather; the price is well within his budget.",
-            score: 95,
-          },
-          {
-            item: {
-              category: "shirts",
-              desc: "Classic breathable piqué with updated sleeve length for modern proportion.",
-              image_url:
-                "https://picsum.photos/seed/organic-pique-navy/600/800",
-              name: "Organic Piqué Polo (Navy)",
-              price: 58,
-              sizes_available: ["S", "M", "L", "XL", "XXL"],
-            },
-            reason:
-              "The navy polo fits Ted's preference for versatile, modern styles and his dominant wardrobe colors.  Its breathable piqué fabric is suitable for Toronto's warm weather and his active lifestyle, and the price aligns with his budget.",
-            score: 95,
-          },
-          {
-            item: {
-              category: "shirts",
-              desc: "Silky pima yarns and breathable knit geometry for high heat commutes.",
-              image_url:
-                "https://picsum.photos/seed/cooling-pima-deepnavy/600/800",
-              name: "Cooling Pima Tee (Deep Navy)",
-              price: 34,
-              sizes_available: ["XS", "S", "M", "L", "XL"],
-            },
-            reason:
-              "The deep navy color, breathable material, and reasonable price align well with Ted's preferences and the warm weather.  The style is versatile enough for his various needs.",
-            score: 95,
-          },
-          {
-            item: {
-              category: "pants",
-              desc: "Polished stretch chino with crease recovery and subtle sateen hand.",
-              image_url:
-                "https://picsum.photos/seed/performance-dress-chino-navy/600/800",
-              name: "Performance Dress Chino (Navy)",
-              price: 86,
-              sizes_available: [
-                "30x30",
-                "30x32",
-                "32x32",
-                "34x32",
-                "36x32",
-                "38x32",
-              ],
-            },
-            reason:
-              "The navy chinos are versatile, fitting Ted's hybrid work style and networking event.  The stretch fabric and tailored fit align with his preferences, and the price is within his budget.",
-            score: 95,
-          },
-          {
-            item: {
-              category: "pants",
-              desc: "Streamlined utility details on a tapered 6-pocket stretch silhouette.",
-              image_url:
-                "https://picsum.photos/seed/minimal-utility-olive/600/800",
-              name: "Minimal Utility Pant (Olive Drab)",
-              price: 92,
-              sizes_available: ["30x30", "30x32", "32x30", "32x32", "34x32"],
-            },
-            reason:
-              "The olive drab color, tailored fit, and stretch fabric align well with Ted's preferences and the warm weather; the price fits his budget, and a 32x32 is available.",
-            score: 95,
-          },
-        ],
-      };
+      // Use Ted's profile data as an example - in a real app, this would come from user input
+      const userProfile: UserProfile = tedProfileData;
 
-      setRecommendations(dummyData.top_10);
-      toast.success("Style recommendations loaded successfully!");
+      try {
+        // Try to get style recommendations using the full API
+        // The API will automatically use the complete catalogue from RecommendationsContext
+        const response: StyleRecommendationsResponse = await getStyleRecommendations(
+          userProfile
+        );
+
+        if (response.success && response.recommendations) {
+          // Transform API response to match our component's expected format
+          // Handle both nested (final-output.top_10) and direct (top_10) response structures
+          const recommendationsData = response.recommendations['final-output']?.top_10 || 
+                                     response.recommendations.top_10 || 
+                                     [];
+          
+          const formattedRecommendations: RecommendationItem[] = 
+            recommendationsData.map((rec: any) => ({
+              item: {
+                category: rec.item.category || rec.category,
+                desc: rec.item.desc || rec.desc,
+                image_url: rec.item.image_url || rec.image_url,
+                name: rec.item.name || rec.name,
+                price: rec.item.price || rec.price,
+                sizes_available: rec.item.sizes_available || rec.sizes_available || [],
+              },
+              reason: rec.reason || "Recommended based on your style preferences",
+              score: rec.score || 85,
+            })) || [];
+
+          setRecommendations(formattedRecommendations);
+          toast.success("Style recommendations loaded successfully!");
+        } else {
+          throw new Error(response.message || "Failed to get recommendations");
+        }
+      } catch (apiError) {
+        console.warn("Style recommendations API failed, trying quick recommendations:", apiError);
+        
+        try {
+          // Fallback to quick recommendations
+          const quickRequest = createQuickRecommendationRequest(userProfile);
+          const quickResponse: QuickRecommendationsResponse = await getQuickRecommendations(quickRequest);
+
+          if (quickResponse.success && quickResponse.recommendations) {
+            // Transform quick recommendations response
+            // Handle both nested (final-output.top_10) and direct (top_10) response structures
+            const recommendationsData = quickResponse.recommendations['final-output']?.top_10 || 
+                                       quickResponse.recommendations.top_10 || 
+                                       [];
+            
+            const formattedRecommendations: RecommendationItem[] = 
+              recommendationsData.map((rec: any) => ({
+                item: {
+                  category: rec.item?.category || rec.category || "general",
+                  desc: rec.item?.desc || rec.desc || "No description available",
+                  image_url: rec.item?.image_url || rec.image_url || `https://picsum.photos/seed/${rec.name}/600/800`,
+                  name: rec.item?.name || rec.name || "Unknown Item",
+                  price: rec.item?.price || rec.price || 0,
+                  sizes_available: rec.item?.sizes_available || rec.sizes_available || ["S", "M", "L"],
+                },
+                reason: rec.reason || "Recommended based on your style preferences",
+                score: rec.score || 85,
+              })) || [];
+
+            setRecommendations(formattedRecommendations);
+            toast.success("Quick recommendations loaded successfully!");
+          } else {
+            throw new Error(quickResponse.message || "Failed to get quick recommendations");
+          }
+        } catch (quickError) {
+          console.error("Both API methods failed, using fallback data:", quickError);
+          
+          // Final fallback to dummy data with better error handling
+          const fallbackData: RecommendationItem[] = sampleCatalogue.map((item, index) => ({
+            item: {
+              category: item.category || "general",
+              desc: item.desc,
+              image_url: item.image_url || `https://picsum.photos/seed/${item.name}/600/800`,
+              name: item.name,
+              price: item.price,
+              sizes_available: item.sizes_available,
+            },
+            reason: `Recommended based on your style preferences for ${item.category || "general"}`,
+            score: 85 + (index * 2), // Vary scores slightly
+          }));
+
+          setRecommendations(fallbackData);
+          toast.warning("Using sample recommendations. API connection failed.");
+        }
+      }
     } catch (error) {
       console.error("Failed to fetch recommendations:", error);
-      toast.error("Failed to load recommendations. Please try again.");
+      toast.error(`Failed to load recommendations: ${getErrorMessage(error)}`);
+      
+      // Even in case of complete failure, show some sample data
+      const fallbackData: RecommendationItem[] = [
+        {
+          item: {
+            category: "shirts",
+            desc: "Moisture-wicking micro-knit V-neck that resists clinging in warm commutes.",
+            image_url: "https://picsum.photos/seed/cooling-tech-vneck-charcoal/600/800",
+            name: "Cooling Tech V-Neck (Charcoal)",
+            price: 32,
+            sizes_available: ["XS", "S", "M", "L", "XL"],
+          },
+          reason: "Sample recommendation - API unavailable",
+          score: 85,
+        }
+      ];
+      setRecommendations(fallbackData);
     } finally {
       setLoading(false);
     }
@@ -201,7 +285,7 @@ const PickClothes: React.FC = () => {
               </h2>
               <p className="text-white/80 mb-6">
                 Our AI stylist is analyzing your preferences and selecting the
-                best clothing recommendations just for you...
+                best clothing recommendations from our API...
               </p>
               <div className="space-y-2">
                 <div className="w-full bg-white/20 rounded-full h-2">
@@ -407,21 +491,33 @@ const PickClothes: React.FC = () => {
           </Card>
         )}
 
-        {filteredRecommendations.length === 0 && (
+        {filteredRecommendations.length === 0 && !loading && (
           <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white">
             <CardContent className="p-8 text-center">
               <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-white/50" />
               <h3 className="text-xl font-semibold mb-2">No items found</h3>
               <p className="text-white/80 mb-4">
-                No clothing items match your current filter. Try selecting a
-                different category.
+                No clothing items match your current filter, or there was an issue loading recommendations.
               </p>
-              <Button
-                variant="glass"
-                onClick={() => setSelectedCategory("all")}
-              >
-                Show All Items
-              </Button>
+              <div className="flex gap-4 justify-center">
+                <Button
+                  variant="glass"
+                  onClick={() => setSelectedCategory("all")}
+                >
+                  Show All Items
+                </Button>
+                <Button
+                  variant="hero"
+                  onClick={retryFetchRecommendations}
+                  disabled={isRetrying}
+                  className="flex items-center gap-2"
+                >
+                  {isRetrying ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : null}
+                  Retry Loading
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
