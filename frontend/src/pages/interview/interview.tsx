@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Sparkles, Home, AlertCircle, CheckCircle } from "lucide-react";
 import { InterviewAPI, INTERVIEW_FLOW_ID } from "./api/api";
 
 const Interview: React.FC = () => {
@@ -13,11 +16,9 @@ const Interview: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-
       const response = await InterviewAPI.createInterview({
         interview_flow_id: INTERVIEW_FLOW_ID,
       });
-
       if (response.success && response.interview_link) {
         setInterviewUrl(response.interview_link);
         setInterviewId(response.interview_id || null);
@@ -36,112 +37,100 @@ const Interview: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        padding: "20px",
-        backgroundColor: "#f5f5f5",
-      }}
-    >
-      <h1 style={{ marginBottom: "30px", color: "#333" }}>Style Interview</h1>
-
-      {!interviewUrl && (
-        <div style={{ textAlign: "center" }}>
-          <p style={{ marginBottom: "20px", color: "#666" }}>
-            Start your personalized styling consultation
-          </p>
-          <button
-            style={{
-              padding: "12px 32px",
-              fontSize: 18,
-              borderRadius: 8,
-              background: loading ? "#ccc" : "#007bff",
-              color: "#fff",
-              border: "none",
-              cursor: loading ? "not-allowed" : "pointer",
-              marginBottom: "20px",
-            }}
-            onClick={createInterview}
-            disabled={loading}
-          >
-            {loading ? "Creating Interview..." : "Start Interview"}
-          </button>
-        </div>
-      )}
-
-      {error && (
+    <div className="min-h-screen bg-gradient-background relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 opacity-20 pointer-events-none">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-primary-glow/30 rounded-full blur-3xl animate-float"></div>
         <div
-          style={{
-            backgroundColor: "#fee",
-            color: "#c33",
-            padding: "12px",
-            borderRadius: "8px",
-            marginBottom: "20px",
-            border: "1px solid #fcc",
-          }}
-        >
-          Error: {error}
-        </div>
-      )}
+          className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-float"
+          style={{ animationDelay: "1.5s" }}
+        ></div>
+      </div>
 
-      {interviewUrl && (
-        <div style={{ width: "100%", maxWidth: "1200px", height: "80vh" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "15px",
-            }}
+      <div className="relative z-10 container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8 animate-fade-in">
+          <Button
+            variant="glass"
+            onClick={() => navigate("/")}
+            className="flex items-center gap-2"
           >
-            <h3 style={{ margin: 0, color: "#333" }}>Your Interview Session</h3>
-            <button
-              style={{
-                padding: "8px 16px",
-                fontSize: 14,
-                borderRadius: 6,
-                background: "#28a745",
-                color: "#fff",
-                border: "none",
-                cursor: "pointer",
-              }}
-              onClick={handleNext}
-            >
-              Continue to Photo →
-            </button>
+            <Home className="w-4 h-4" />
+            Back to Home
+          </Button>
+
+          <div className="flex items-center gap-2 text-white">
+            <Sparkles className="w-5 h-5 text-primary-glow" />
+            <h1 className="text-xl font-semibold">Style Interview</h1>
           </div>
 
-          {interviewId && (
-            <p
-              style={{
-                fontSize: "12px",
-                color: "#666",
-                marginBottom: "10px",
-              }}
-            >
-              Interview ID: {interviewId}
-            </p>
-          )}
-
-          <iframe
-            src={interviewUrl}
-            style={{
-              width: "100%",
-              height: "100%",
-              border: "2px solid #ddd",
-              borderRadius: "12px",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-            }}
-            title="Style Interview"
-            allow="camera; microphone; autoplay"
-            allowFullScreen
-          />
         </div>
-      )}
+
+        {/* Main Content */}
+        <div className="max-w-[95%] w-[95%] mx-auto">
+          <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white mb-8 w-full">
+            <CardHeader>
+              <CardTitle className="text-center text-3xl font-bold text-white mb-2">
+                Start Your Style Interview
+              </CardTitle>
+              <p className="text-center text-white/80 text-lg">
+                Begin your personalized styling consultation
+              </p>
+            </CardHeader>
+            <CardContent className="p-8">
+              {!interviewUrl && (
+                <div className="flex flex-col items-center justify-center space-y-6">
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    onClick={createInterview}
+                    disabled={loading}
+                    className="w-full max-w-xs"
+                  >
+                    {loading ? "Creating Interview..." : "Start Interview"}
+                  </Button>
+                  {error && (
+                    <div className="flex items-center gap-2 bg-red-100/80 text-red-700 px-4 py-2 rounded-lg border border-red-200 animate-shake">
+                      <AlertCircle className="w-5 h-5" />
+                      <span>Error: {error}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {interviewUrl && (
+                <div className="w-full max-w-5xl mx-auto">
+                  <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
+                    <h3 className="text-lg font-semibold text-white mb-0">Your Interview Session</h3>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleNext}
+                      className="flex items-center gap-2"
+                    >
+                      Continue to Photo <Sparkles className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {interviewId && (
+                    <p className="text-xs text-white/70 mb-2">Interview ID: {interviewId}</p>
+                  )}
+                  <div className="rounded-2xl overflow-hidden border-2 border-white/20 shadow-lg bg-black/30">
+                    <iframe
+                      src={interviewUrl}
+                      className="w-full h-[75vh] min-h-[500px] border-0 rounded-2xl"
+                      style={{ minHeight: '500px', height: '75vh' }}
+                      title="Style Interview"
+                      allow="camera; microphone; autoplay"
+                      allowFullScreen
+                    />
+                  </div>
+              
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
