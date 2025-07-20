@@ -7,9 +7,15 @@ It supports creating interview flows, creating interviews, and retrieving interv
 
 import os
 import requests
+import os
+import requests
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
-from dotenv import load_dotenv
+
+# Import config to get API keys
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import Config
 
 @dataclass
 class InterviewFlow:
@@ -47,13 +53,10 @@ class RibbonClient:
         Initialize the Ribbon client
         
         Args:
-            api_key: Ribbon API key. If not provided, will try to load from .env file
+            api_key: Ribbon API key. If not provided, will try to load from config
             enable_advanced_features: Whether to enable advanced features (requires higher plan tier)
         """
-        # Load environment variables
-        load_dotenv()
-        
-        self.api_key = api_key or os.getenv('RIBBON_API_KEY')
+        self.api_key = api_key or Config.RIBBON_API_KEY
         if not self.api_key:
             raise ValueError("API key is required. Provide it directly or set RIBBON_API_KEY in .env file")
         
