@@ -192,66 +192,23 @@ def get_interview_audio(interview_id):
 
 @interview_bp.route('/quick-flow', methods=['POST'])
 def create_quick_flow():
-    """Create a quick interview flow with predefined templates"""
+    """Create a quick interview flow for stylist consultation"""
     try:
         data = request.get_json()
         
-        # Validate required fields
-        if 'template' not in data:
-            return jsonify({"error": "Missing required field: template"}), 400
+        org_name = data.get('org_name', 'Your Styling Company')
         
-        template = data['template'].lower()
-        org_name = data.get('org_name', 'Your Company')
-        
-        # Predefined templates
-        templates = {
-            'feedback': {
-                'title': 'Customer Feedback Collection',
-                'questions': [
-                    "How would you rate your overall experience with our product?",
-                    "What features do you find most valuable?",
-                    "What challenges have you encountered?",
-                    "What improvements would you like to see?",
-                    "How likely are you to recommend us to others?",
-                    "Any additional feedback or suggestions?"
-                ],
-                'interview_type': 'general',
-                'additional_info': 'Customer feedback collection interview'
-            },
-            'onboarding': {
-                'title': 'Employee Onboarding Feedback',
-                'questions': [
-                    "How would you rate your onboarding experience?",
-                    "What aspects were most helpful?",
-                    "What information was missing?",
-                    "How prepared do you feel for your role?",
-                    "What would you improve about onboarding?",
-                    "Any other feedback about your first week?"
-                ],
-                'interview_type': 'general',
-                'additional_info': 'Employee onboarding feedback collection'
-            },
-            'tech_interview': {
-                'title': 'Technical Interview',
-                'questions': [
-                    "Tell me about your programming background.",
-                    "Explain your experience with our tech stack.",
-                    "How do you approach problem-solving?",
-                    "Describe a challenging project you've worked on.",
-                    "How do you stay updated with technology trends?",
-                    "Do you have any questions about the role?"
-                ],
-                'interview_type': 'recruitment',
-                'additional_info': 'Technical screening interview'
-            }
+        # Stylist consultation template
+        template_data = {
+            'title': 'Personal Styling Consultation',
+            'questions': [
+                "What's your current style like and how would you describe your fashion preferences?",
+                "What occasions or situations are you looking to dress for?",
+                "What are your biggest styling challenges or areas where you'd like recommendations?"
+            ],
+            'interview_type': 'consultation',
+            'additional_info': 'Personal styling consultation to provide tailored fashion recommendations'
         }
-        
-        if template not in templates:
-            return jsonify({
-                "error": f"Unknown template: {template}. Available: {list(templates.keys())}"
-            }), 400
-        
-        template_data = templates[template]
         
         # Create InterviewFlow object
         flow = InterviewFlow(
@@ -268,43 +225,31 @@ def create_quick_flow():
         
         return jsonify({
             "success": True,
-            "template": template,
+            "template": "stylist_consultation",
             "flow_id": flow.interview_flow_id,
-            "message": f"Quick {template} flow created successfully",
+            "message": "Stylist consultation flow created successfully",
             "data": result
         })
         
     except ValueError as e:
         return jsonify({"error": f"Configuration error: {str(e)}"}), 400
     except Exception as e:
-        return jsonify({"error": f"Failed to create quick flow: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to create stylist consultation flow: {str(e)}"}), 500
 
 
 @interview_bp.route('/templates', methods=['GET'])
 def get_available_templates():
-    """Get list of available quick flow templates"""
-    templates = {
-        'feedback': {
-            'name': 'Customer Feedback Collection',
-            'description': 'Collect customer feedback and satisfaction ratings',
-            'question_count': 6,
-            'type': 'general'
-        },
-        'onboarding': {
-            'name': 'Employee Onboarding Feedback',
-            'description': 'Gather feedback from new employees about onboarding',
-            'question_count': 6,
-            'type': 'general'
-        },
-        'tech_interview': {
-            'name': 'Technical Interview',
-            'description': 'Technical screening for software engineering roles',
-            'question_count': 6,
-            'type': 'recruitment'
+    """Get available template information"""
+    template = {
+        'stylist_consultation': {
+            'name': 'Personal Styling Consultation',
+            'description': 'Consultation to understand client style preferences and provide personalized recommendations',
+            'question_count': 3,
+            'type': 'consultation'
         }
     }
     
     return jsonify({
         "success": True,
-        "templates": templates
+        "template": template
     })
