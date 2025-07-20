@@ -11,7 +11,6 @@ from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
-
 @dataclass
 class InterviewFlow:
     """Data class for interview flow configuration"""

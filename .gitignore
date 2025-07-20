@@ -36,7 +36,6 @@ wheels/
 *.log
 *.bak
 *.swp
-*.env
 
 # System files
 *.DS_Store
