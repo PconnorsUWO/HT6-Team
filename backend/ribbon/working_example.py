@@ -22,78 +22,16 @@ def create_sample_interview_flows():
     # Define different flow templates
     flows_to_create = [
         {
-            "org_name": "TechCorp Solutions",
-            "title": "Software Engineer Technical Interview",
+            "org_name": "Styled.ai",
+            "title": "Get Dripped or Drowned",
             "questions": [
-                "Tell me about yourself and your programming background.",
-                "Explain the difference between object-oriented and functional programming.",
-                "How would you design a scalable web application?",
-                "Describe a challenging bug you've encountered and how you solved it.",
-                "What are your favorite programming languages and why?",
-                "How do you stay updated with new technologies?",
-                "Tell me about a project you're particularly proud of."
+                "Are the pieces we try on today for any specific ocassion",
+                "What are your style goals?",
+                "What should we avoid?",
             ],
-            "interview_type": "recruitment",
-            "additional_info": "Technical screening for software engineering position"
+            "interview_type": "Styling Appointment",
+            "additional_info": "Get Dripped Beyond Belief"
         },
-        {
-            "org_name": "Creative Agency Inc",
-            "title": "UX/UI Designer Portfolio Review",
-            "questions": [
-                "Walk me through your design background and experience.",
-                "Show me a project from your portfolio and explain your design process.",
-                "How do you approach user research and testing?",
-                "Describe a time when you had to defend a design decision.",
-                "What design tools do you prefer and why?",
-                "How do you handle feedback and iterate on designs?",
-                "Where do you find design inspiration?"
-            ],
-            "interview_type": "recruitment",
-            "additional_info": "Portfolio review and design process discussion"
-        },
-        {
-            "org_name": "StartupX",
-            "title": "Product Manager Behavioral Interview",
-            "questions": [
-                "Tell me about your product management experience.",
-                "Describe a product you launched from idea to market.",
-                "How do you prioritize features in a product roadmap?",
-                "Tell me about a time you had to make a difficult product decision.",
-                "How do you work with engineering and design teams?",
-                "Describe your approach to user feedback and data analysis.",
-                "What metrics do you use to measure product success?"
-            ],
-            "interview_type": "recruitment",
-            "additional_info": "Behavioral interview focusing on product management skills"
-        },
-        {
-            "org_name": "Research Institute",
-            "title": "Customer Feedback Collection",
-            "questions": [
-                "How would you rate your overall experience with our product?",
-                "What features do you find most valuable?",
-                "What challenges or pain points have you encountered?",
-                "How likely are you to recommend our product to others?",
-                "What improvements would you like to see?",
-                "How does our product compare to alternatives you've used?"
-            ],
-            "interview_type": "general",
-            "additional_info": "Customer satisfaction and feedback collection"
-        },
-        {
-            "org_name": "EduTech Academy",
-            "title": "Student Learning Assessment",
-            "questions": [
-                "What subjects are you most interested in learning?",
-                "How do you prefer to learn new concepts?",
-                "What learning challenges do you face?",
-                "Describe your ideal learning environment.",
-                "What motivates you to continue learning?",
-                "How do you measure your learning progress?"
-            ],
-            "interview_type": "general",
-            "additional_info": "Understanding student learning preferences and needs"
-        }
     ]
     
     created_flows = []

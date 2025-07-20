@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import Interview from './pages/interview';
+import Interview from './pages/interview/interview';
 import TakePhoto from './pages/take_photo';
 import Final from './pages/Final';
 
