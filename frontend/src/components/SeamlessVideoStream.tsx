@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import StreamingService from "../services/streamingService";
 import type { AnnotatedFrameData } from "../services/streamingService";
 
@@ -23,7 +24,6 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
   const [cleanFrame, setCleanFrame] = useState<string>(""); // Clean frame without annotations
   const [confidence, setConfidence] = useState(0);
   const [bestConfidence, setBestConfidence] = useState(0);
-  const [error, setError] = useState<string>("");
   const [frameCount, setFrameCount] = useState(0);
   const [isAutoStopping, setIsAutoStopping] = useState(false);
   const [debugMode, setDebugMode] = useState(false); // Enable debug mode by default
@@ -39,7 +39,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
   const displayVideoRef = useRef<HTMLVideoElement>(null); // Separate video element for display
   const streamingServiceRef = useRef<StreamingService | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const autoStopTimeoutRef = useRef<number | null>(null);
+  const autoStopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     initializeStreamingService();
@@ -116,6 +116,9 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
                 eyes: [],
                 pose_landmarks: [],
               });
+              toast.success(
+                "Perfect pose detected and captured automatically!"
+              );
             }
           }, 2000); // 2 seconds after sustained confidence
         }
@@ -152,7 +155,6 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
       service.setOnConnected(() => {
         console.log("✅ Connected to streaming service");
         setIsConnected(true);
-        setError("");
       });
 
       service.setOnDisconnected(() => {
@@ -196,7 +198,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
 
       service.setOnError((errorMsg: string) => {
         console.error("Streaming error:", errorMsg);
-        setError(errorMsg);
+        toast.error(errorMsg);
         onError?.(errorMsg);
       });
 
@@ -205,7 +207,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
       streamingServiceRef.current = service;
     } catch (err) {
       console.error("Failed to initialize streaming service:", err);
-      setError("Failed to connect to streaming service");
+      toast.error("Failed to connect to streaming service");
       onError?.("Failed to connect to streaming service");
     }
   };
@@ -216,13 +218,42 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
         throw new Error("Streaming service not initialized");
       }
 
+      // Get available video input devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(
+        (device) => device.kind === "videoinput"
+      );
+
+      console.log("Available video devices:", videoDevices);
+
+      // Use second camera if available, otherwise fall back to environment camera
+      const videoConstraints: MediaTrackConstraints = {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+      };
+
+      if (videoDevices.length >= 2) {
+        // Use the second camera (index 1)
+        videoConstraints.deviceId = { exact: videoDevices[1].deviceId };
+        console.log(
+          "Using second camera:",
+          videoDevices[1].label || "Camera 2"
+        );
+        toast.success(`Using camera: ${videoDevices[1].label || "Camera 2"}`);
+      } else if (videoDevices.length === 1) {
+        // Only one camera available, try environment facing (back camera)
+        videoConstraints.facingMode = "environment";
+        console.log("Only one camera found, trying environment facing");
+        toast.info("Using back camera (environment facing)");
+      } else {
+        // Fallback to default user camera
+        videoConstraints.facingMode = "user";
+        console.log("No specific camera found, using default");
+      }
+
       // Get camera access
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user",
-        },
+        video: videoConstraints,
         audio: false,
       });
 
@@ -286,7 +317,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
       }, 2000); // Simple 2-second delay
     } catch (err) {
       console.error("Failed to start streaming:", err);
-      setError("Failed to start camera stream");
+      toast.error("Failed to start camera stream");
       onError?.("Failed to start camera stream");
     }
   };
@@ -311,6 +342,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
       }
     } catch (err) {
       console.error("Failed to stop streaming:", err);
+      toast.error("Failed to stop streaming");
     }
   };
 
@@ -322,19 +354,6 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
   // Show only the backend annotated stream
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-black">
-      {/* Error Display - Only show if there's an error */}
-      {error && (
-        <div className="absolute top-4 left-4 right-4 z-10 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <strong>Error:</strong> {error}
-          <button
-            onClick={() => setError("")}
-            className="float-right font-bold"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
       {/* Hidden video element for frame capture */}
       <video
         ref={videoRef}
@@ -347,6 +366,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
         }}
         onError={(e) => {
           console.error("Hidden video element error:", e);
+          toast.error("Video element error");
         }}
       />
 
@@ -368,6 +388,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
                   }}
                   onError={(e) => {
                     console.error("Display video element error:", e);
+                    toast.error("Display video element error");
                   }}
                 />
                 <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
@@ -383,7 +404,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
                   className="w-full h-full object-contain"
                   onError={(e) => {
                     console.error("Failed to load annotated frame:", e);
-                    setError("Failed to display video stream");
+                    toast.error("Failed to display video stream");
                   }}
                 />
                 <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
@@ -400,7 +421,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
                 className="w-full h-full object-contain"
                 onError={(e) => {
                   console.error("Failed to load annotated frame:", e);
-                  setError("Failed to display video stream");
+                  toast.error("Failed to display video stream");
                 }}
               />
               <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
@@ -422,6 +443,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
               }}
               onError={(e) => {
                 console.error("Video element error:", e);
+                toast.error("Video element error");
               }}
             />
 
@@ -480,6 +502,7 @@ const SeamlessVideoStream: React.FC<SeamlessVideoStreamProps> = ({
                   eyes: [],
                   pose_landmarks: [],
                 });
+                toast.success("Frame selected manually!");
               }
             }}
           >

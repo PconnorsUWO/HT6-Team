@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import SeamlessVideoStream from "./components/SeamlessVideoStream";
-import type { AnnotatedFrameData } from "./services/streamingService";
+import { toast } from "sonner";
+import SeamlessVideoStream from "./SeamlessVideoStream";
+import type { AnnotatedFrameData } from "../services/streamingService";
 
 interface Garment {
   id: string;
@@ -71,7 +72,6 @@ function App() {
     useState<BodyDetectionResult | null>(null);
   const [tryOnResult, setTryOnResult] = useState<TryOnResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>("");
   const [recordingDuration, setRecordingDuration] = useState(0);
 
   // New state for real-time streaming
@@ -83,7 +83,7 @@ function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mimeTypeRef = useRef<string>("");
-  const durationIntervalRef = useRef<number | null>(null);
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     console.log("recording duration", recordingDuration);
@@ -105,7 +105,7 @@ function App() {
       console.log("✅ Backend connection test:", data);
     } catch (err) {
       console.error("❌ Backend connection failed:", err);
-      setError(
+      toast.error(
         "Cannot connect to backend server. Please ensure the backend is running on http://127.0.0.1:5000"
       );
     }
@@ -120,7 +120,7 @@ function App() {
       }
     } catch (err) {
       console.error("Error fetching garments:", err);
-      setError("Failed to load preset garments");
+      toast.error("Failed to load preset garments");
     }
   };
 
@@ -138,13 +138,13 @@ function App() {
       const data = await response.json();
       if (data.success) {
         setSelectedGarment(data.garment_id);
-        setError("");
+        toast.success("Garment uploaded successfully!");
       } else {
-        setError(data.error || "Failed to upload garment");
+        toast.error(data.error || "Failed to upload garment");
       }
     } catch (err) {
       console.error("Error uploading garment:", err);
-      setError("Failed to upload garment");
+      toast.error("Failed to upload garment");
     }
   };
 
@@ -156,21 +156,53 @@ function App() {
     setSelectedFrame(frameData);
     setRealtimeDetectionData(detectionData);
     setCurrentStep(4); // Move directly to try-on step
+    toast.success("Frame selected! Ready for virtual try-on.");
   };
 
   // New handler for real-time streaming errors
   const handleStreamingError = (errorMsg: string) => {
-    setError(errorMsg);
+    toast.error(errorMsg);
   };
 
   const startVideoRecording = async () => {
     try {
+      // Get available video input devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(
+        (device) => device.kind === "videoinput"
+      );
+
+      console.log("Available video devices:", videoDevices);
+
+      // Use second camera if available, otherwise fall back to environment camera
+      const videoConstraints: MediaTrackConstraints = {
+        width: 540,
+        height: 960,
+      };
+
+      if (videoDevices.length >= 2) {
+        // Use the second camera (index 1)
+        videoConstraints.deviceId = { exact: videoDevices[1].deviceId };
+        console.log(
+          "Using second camera for recording:",
+          videoDevices[1].label || "Camera 2"
+        );
+        toast.success(`Recording with: ${videoDevices[1].label || "Camera 2"}`);
+      } else if (videoDevices.length === 1) {
+        // Only one camera available, try environment facing (back camera)
+        videoConstraints.facingMode = "environment";
+        console.log(
+          "Only one camera found, trying environment facing for recording"
+        );
+        toast.info("Recording with back camera (environment facing)");
+      } else {
+        // Fallback to default user camera
+        videoConstraints.facingMode = "user";
+        console.log("No specific camera found, using default for recording");
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: 540,
-          height: 960,
-          facingMode: "user",
-        },
+        video: videoConstraints,
       });
 
       streamRef.current = stream;
@@ -239,7 +271,6 @@ function App() {
 
       const startTime = Date.now();
       setRecordingDuration(0);
-      setError("");
 
       // Start duration timer
       const durationInterval = setInterval(() => {
@@ -252,7 +283,7 @@ function App() {
       durationIntervalRef.current = durationInterval;
     } catch (err) {
       console.error("Error starting video recording:", err);
-      setError(
+      toast.error(
         "Failed to start video recording. Please check camera permissions."
       );
     }
@@ -285,7 +316,7 @@ function App() {
 
     // Validate minimum recording duration
     if (recordingDuration < 4) {
-      setError(
+      toast.error(
         "Video must be at least 4 seconds long for processing. Please record a longer video."
       );
       return;
@@ -299,7 +330,6 @@ function App() {
     });
 
     setLoading(true);
-    setError("");
     setCurrentStep(3); // Move to processing step
 
     try {
@@ -341,12 +371,13 @@ function App() {
         console.log(
           `Body detection successful with confidence: ${processData.confidence}`
         );
+        toast.success("Body detection completed successfully!");
       } else {
-        setError(processData.message || "Failed to detect body in video");
+        toast.error(processData.message || "Failed to detect body in video");
       }
     } catch (err) {
       console.error("Error processing video:", err);
-      setError("Failed to process video");
+      toast.error("Failed to process video");
     } finally {
       setLoading(false);
     }
@@ -356,7 +387,6 @@ function App() {
     if (!selectedGarment || !selectedFrame) return;
 
     setLoading(true);
-    setError("");
 
     try {
       // Convert base64 data URL to a file for upload
@@ -386,12 +416,13 @@ function App() {
       if (data.success) {
         setTryOnResult(data);
         setCurrentStep(5);
+        toast.success("Virtual try-on completed successfully!");
       } else {
-        setError(data.error || "Failed to perform try-on");
+        toast.error(data.error || "Failed to perform try-on");
       }
     } catch (err) {
       console.error("Error performing try-on:", err);
-      setError("Failed to perform try-on");
+      toast.error("Failed to perform try-on");
     } finally {
       setLoading(false);
     }
@@ -413,9 +444,9 @@ function App() {
     setSelectedFrame("");
     setBodyDetectionResult(null);
     setTryOnResult(null);
-    setError("");
     setLoading(false);
     setRealtimeDetectionData(null);
+    toast.success("App reset successfully!");
   };
 
   return (
@@ -451,21 +482,6 @@ function App() {
           ))}
         </div>
       </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="max-w-2xl mx-auto mb-8 px-4">
-          <div className="bg-red-500 text-white p-4 rounded-lg text-center shadow-lg">
-            {error}
-            <button
-              onClick={testBackendConnection}
-              className="ml-4 bg-white text-red-500 px-3 py-1 rounded text-sm hover:bg-gray-100"
-            >
-              Test Connection
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4">
