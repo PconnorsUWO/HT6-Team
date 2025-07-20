@@ -7,7 +7,6 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Interview from './pages/interview';
 import TakePhoto from './pages/take_photo';
-import Final from './pages/Final';
 
 const queryClient = new QueryClient();
 
@@ -21,7 +20,6 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/interview" element={<Interview />} />
           <Route path="/take_photo" element={<TakePhoto />} />
-          <Route path="/final" element={<Final />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
