@@ -1,243 +1,242 @@
 [
-    {
-      "category": "dress",
-      "desc": "A chic brown midi dress with a structured fit and a statement belt for a polished look.",
-      "image_url": "frontend/public/catalog/brown_midi_dress.jpg",
-      "name": "Belted Brown Midi Dress",
-      "price": 104.99,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "dress",
-      "desc": "A breezy yellow printed dress with a smocked top, perfect for sunny days.",
-      "image_url": "frontend/public/catalog/yellow_midi_dress.jpg",
-      "name": "Yellow Printed Midi Dress",
-      "price": 97.50,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "dress",
-      "desc": "An off-shoulder floral dress featuring a colorful, artistic print and flowy silhouette.",
-      "image_url": "frontend/public/catalog/painted_dress.jpg",
-      "name": "Floral Off-Shoulder Dress",
-      "price": 108.25,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "dress",
-      "desc": "A sleeveless beige wrap dress with contrasting trim and a textured waist belt for a tailored fit.",
-      "image_url": "frontend/public/catalog/white_madi_dress.jpg",
-      "name": "Beige Wrap Midi Dress",
-      "price": 102.30,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "dress",
-      "desc": "A fitted olive green midi dress with ruching and an elegant shoulder brooch.",
-      "image_url": "frontend/public/catalog/green_dress.jpg",
-      "name": "Ruched Olive Midi Dress",
-      "price": 106.90,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "dress",
-      "desc": "A sleek red satin slip dress with a minimalist silhouette and delicate straps.",
-      "image_url": "frontend/public/catalog/red_satin_dress.jpg",
-      "name": "Red Satin Slip Dress",
-      "price": 99.80,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "dress",
-      "desc": "A deep burgundy dress with draped details and a metallic pin accent on the shoulder.",
-      "image_url": "frontend/public/catalog/red_dress.jpg",
-      "name": "Burgundy Draped Dress",
-      "price": 109.20,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "dress",
-      "desc": "A white midi dress with a structured bodice and wide straps for an elegant summer look.",
-      "image_url": "frontend/public/catalog/white_maxi_dress.jpg",
-      "name": "White Structured Midi Dress",
-      "price": 100.60,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "A crisp white button-up jumpsuit with wide legs and a flattering waist belt.",
-      "image_url": "frontend/public/catalog/white_jumpsuit.jpg",
-      "name": "White Belted Jumpsuit",
-      "price": 84.75,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "A pair of off-white wide-leg trousers crafted from breathable fabric for all-day comfort.",
-      "image_url": "frontend/public/catalog/white_wide_pants.jpg",
-      "name": "White Wide-Leg Trousers",
-      "price": 92.60,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "dress",
-      "desc": "A slate blue ruched bodycon dress with a single-shoulder neckline and gold-tone shell embellishment.",
-      "image_url": "frontend/public/catalog/seashell_dress.jpg",
-      "name": "One-Shoulder Ruched Dress",
-      "price": 107.95,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Tailored sage green Bermuda shorts with a suede-effect belt for a refined summer look.",
-      "image_url": "frontend/public/catalog/green_shorts.jpg",
-      "name": "Belted Pleated Shorts",
-      "price": 86.40,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Knitted drawstring pants in a deep green plaid with a soft, cozy feel and elastic waistband.",
-      "image_url": "frontend/public/catalog/green_pants.jpg",
-      "name": "Green Knit Plaid Pants",
-      "price": 89.50,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Relaxed-fit tie-dye inspired velour pants in warm red tones, ideal for cozy styling.",
-      "image_url": "frontend/public/catalog/red_pants.jpg",
-      "name": "Red Swirl Velour Pants",
-      "price": 90.80,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Classic white sweatpants in a breathable cotton blend with adjustable drawstring waist.",
-      "image_url": "frontend/public/catalog/sweats_white.jpg",
-      "name": "White Drawstring Sweatpants",
-      "price": 85.99,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Minimalist black shorts with an elasticated waist and textured finish for everyday comfort.",
-      "image_url": "frontend/public/catalog/shorts.jpg",
-      "name": "Black Textured Knit Shorts",
-      "price": 83.45,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "Light yellow button-up shirt with a crisp collar and subtle structure, perfect for layering or standalone wear.",
-      "image_url": "frontend/public/catalog/yellow_button.jpg",
-      "name": "Soft Yellow Button-Up Shirt",
-      "price": 78.20,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Elegant white wide-leg trousers with tailored seams and a clean, minimalist silhouette.",
-      "image_url": "frontend/public/catalog/white_pants.jpg",
-      "name": "White Tailored Trousers",
-      "price": 94.10,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Classic light-wash jeans with a high waist and relaxed straight-leg cut for casual comfort.",
-      "image_url": "frontend/public/catalog/gray_jeans.jpg",
-      "name": "Washed Gray Straight Jeans",
-      "price": 91.35,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "A bold short-sleeve shirt featuring vertical black and white stripes, perfect for a crisp summer look.",
-      "image_url": "frontend/public/catalog/stripe_shirt.jpg",
-      "name": "Vertical Stripe Short-Sleeve Shirt",
-      "price": 69.50,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "Short-sleeve floral shirt in muted olive tones with a soft, breezy linen blend and chest pocket.",
-      "image_url": "frontend/public/catalog/floral_shirt.jpg",
-      "name": "Olive Floral Camp Collar Shirt",
-      "price": 74.99,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "Classic oversized white tee made from breathable cotton, ideal for layering or solo wear.",
-      "image_url": "frontend/public/catalog/white_shirt.jpg",
-      "name": "Basic White Oversized T-Shirt",
-      "price": 65.00,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "A sleek navy blue knit polo shirt with a clean three-button collar and soft texture.",
-      "image_url": "frontend/public/catalog/polo_shirt.jpg",
-      "name": "Navy Knit Polo Shirt",
-      "price": 72.30,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Light-wash denim jeans with a relaxed fit and high-rise waist for laid-back everyday wear.",
-      "image_url": "frontend/public/catalog/jeans.jpg",
-      "name": "Light Blue Relaxed Jeans",
-      "price": 88.25,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "A deep navy blue button-up shirt with a structured collar and chest pocket for everyday smart-casual wear.",
-      "image_url": "frontend/public/catalog/button_shirt.jpg",
-      "name": "Dark Navy Cotton Shirt",
-      "price": 81.90,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "Refined beige linen blazer with notched lapels and flap pockets—perfect for summer formal wear.",
-      "image_url": "frontend/public/catalog/blazer.jpg",
-      "name": "Beige Linen Blazer",
-      "price": 85.00,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Slim-fit black trousers made from breathable fabric for elevated comfort and style.",
-      "image_url": "frontend/public/catalog/black_pants.jpg",
-      "name": "Black Lightweight Trousers",
-      "price": 93.70,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "Short-sleeve button-up shirt in pure white linen with a relaxed drape and summer-ready cut.",
-      "image_url": "frontend/public/catalog/linen_shirt.jpg",
-      "name": "White Linen Open-Collar Shirt",
-      "price": 80.40,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "lower_body",
-      "desc": "Tailored-fit pants crafted from breathable beige linen for an airy, elevated summer outfit.",
-      "image_url": "frontend/public/catalog/linen_pants.jpg",
-      "name": "Beige Linen Slim Pants",
-      "price": 90.45,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    },
-    {
-      "category": "upper_body",
-      "desc": "A textured short-sleeve shirt featuring a vertical woven pattern in neutral and blue tones, perfect for layering or wearing on its own.",
-      "image_url": "frontend/public/catalog/textured_shirt.jpg",
-      "name": "Textured Woven Pattern Shirt",
-      "price": 79.90,
-      "sizes_available": ["XS", "S", "M", "L", "XL"]
-    }
-  ]
-  
+  {
+    "category": "dress",
+    "desc": "A chic brown midi dress with a structured fit and a statement belt for a polished look.",
+    "image_url": "/catalog/brown_midi_dress.jpg",
+    "name": "Belted Brown Midi Dress",
+    "price": 104.99,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "dress",
+    "desc": "A breezy yellow printed dress with a smocked top, perfect for sunny days.",
+    "image_url": "/catalog/yellow_midi_dress.jpg",
+    "name": "Yellow Printed Midi Dress",
+    "price": 97.5,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "dress",
+    "desc": "An off-shoulder floral dress featuring a colorful, artistic print and flowy silhouette.",
+    "image_url": "/catalog/painted_dress.jpg",
+    "name": "Floral Off-Shoulder Dress",
+    "price": 108.25,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "dress",
+    "desc": "A sleeveless beige wrap dress with contrasting trim and a textured waist belt for a tailored fit.",
+    "image_url": "/catalog/white_madi_dress.jpg",
+    "name": "Beige Wrap Midi Dress",
+    "price": 102.3,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "dress",
+    "desc": "A fitted olive green midi dress with ruching and an elegant shoulder brooch.",
+    "image_url": "/catalog/green_dress.jpg",
+    "name": "Ruched Olive Midi Dress",
+    "price": 106.9,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "dress",
+    "desc": "A sleek red satin slip dress with a minimalist silhouette and delicate straps.",
+    "image_url": "/catalog/red_satin_dress.jpg",
+    "name": "Red Satin Slip Dress",
+    "price": 99.8,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "dress",
+    "desc": "A deep burgundy dress with draped details and a metallic pin accent on the shoulder.",
+    "image_url": "/catalog/red_dress.jpg",
+    "name": "Burgundy Draped Dress",
+    "price": 109.2,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "dress",
+    "desc": "A white midi dress with a structured bodice and wide straps for an elegant summer look.",
+    "image_url": "/catalog/white_maxi_dress.jpg",
+    "name": "White Structured Midi Dress",
+    "price": 100.6,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "A crisp white button-up jumpsuit with wide legs and a flattering waist belt.",
+    "image_url": "/catalog/white_jumpsuit.jpg",
+    "name": "White Belted Jumpsuit",
+    "price": 84.75,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "A pair of off-white wide-leg trousers crafted from breathable fabric for all-day comfort.",
+    "image_url": "/catalog/white_wide_pants.jpg",
+    "name": "White Wide-Leg Trousers",
+    "price": 92.6,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "dress",
+    "desc": "A slate blue ruched bodycon dress with a single-shoulder neckline and gold-tone shell embellishment.",
+    "image_url": "/catalog/seashell_dress.jpg",
+    "name": "One-Shoulder Ruched Dress",
+    "price": 107.95,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Tailored sage green Bermuda shorts with a suede-effect belt for a refined summer look.",
+    "image_url": "/catalog/green_shorts.jpg",
+    "name": "Belted Pleated Shorts",
+    "price": 86.4,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Knitted drawstring pants in a deep green plaid with a soft, cozy feel and elastic waistband.",
+    "image_url": "/catalog/green_pants.jpg",
+    "name": "Green Knit Plaid Pants",
+    "price": 89.5,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Relaxed-fit tie-dye inspired velour pants in warm red tones, ideal for cozy styling.",
+    "image_url": "/catalog/red_pants.jpg",
+    "name": "Red Swirl Velour Pants",
+    "price": 90.8,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Classic white sweatpants in a breathable cotton blend with adjustable drawstring waist.",
+    "image_url": "/catalog/sweats_white.jpg",
+    "name": "White Drawstring Sweatpants",
+    "price": 85.99,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Minimalist black shorts with an elasticated waist and textured finish for everyday comfort.",
+    "image_url": "/catalog/shorts.jpg",
+    "name": "Black Textured Knit Shorts",
+    "price": 83.45,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "Light yellow button-up shirt with a crisp collar and subtle structure, perfect for layering or standalone wear.",
+    "image_url": "/catalog/yellow_button.jpg",
+    "name": "Soft Yellow Button-Up Shirt",
+    "price": 78.2,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Elegant white wide-leg trousers with tailored seams and a clean, minimalist silhouette.",
+    "image_url": "/catalog/white_pants.jpg",
+    "name": "White Tailored Trousers",
+    "price": 94.1,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Classic light-wash jeans with a high waist and relaxed straight-leg cut for casual comfort.",
+    "image_url": "/catalog/gray_jeans.jpg",
+    "name": "Washed Gray Straight Jeans",
+    "price": 91.35,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "A bold short-sleeve shirt featuring vertical black and white stripes, perfect for a crisp summer look.",
+    "image_url": "/catalog/stripe_shirt.jpg",
+    "name": "Vertical Stripe Short-Sleeve Shirt",
+    "price": 69.5,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "Short-sleeve floral shirt in muted olive tones with a soft, breezy linen blend and chest pocket.",
+    "image_url": "/catalog/floral_shirt.jpg",
+    "name": "Olive Floral Camp Collar Shirt",
+    "price": 74.99,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "Classic oversized white tee made from breathable cotton, ideal for layering or solo wear.",
+    "image_url": "/catalog/white_shirt.jpg",
+    "name": "Basic White Oversized T-Shirt",
+    "price": 65.0,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "A sleek navy blue knit polo shirt with a clean three-button collar and soft texture.",
+    "image_url": "/catalog/polo_shirt.jpg",
+    "name": "Navy Knit Polo Shirt",
+    "price": 72.3,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Light-wash denim jeans with a relaxed fit and high-rise waist for laid-back everyday wear.",
+    "image_url": "/catalog/jeans.jpg",
+    "name": "Light Blue Relaxed Jeans",
+    "price": 88.25,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "A deep navy blue button-up shirt with a structured collar and chest pocket for everyday smart-casual wear.",
+    "image_url": "/catalog/button_shirt.jpg",
+    "name": "Dark Navy Cotton Shirt",
+    "price": 81.9,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "Refined beige linen blazer with notched lapels and flap pockets—perfect for summer formal wear.",
+    "image_url": "/catalog/blazer.jpg",
+    "name": "Beige Linen Blazer",
+    "price": 85.0,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Slim-fit black trousers made from breathable fabric for elevated comfort and style.",
+    "image_url": "/catalog/black_pants.jpg",
+    "name": "Black Lightweight Trousers",
+    "price": 93.7,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "Short-sleeve button-up shirt in pure white linen with a relaxed drape and summer-ready cut.",
+    "image_url": "/catalog/linen_shirt.jpg",
+    "name": "White Linen Open-Collar Shirt",
+    "price": 80.4,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "lower_body",
+    "desc": "Tailored-fit pants crafted from breathable beige linen for an airy, elevated summer outfit.",
+    "image_url": "/catalog/linen_pants.jpg",
+    "name": "Beige Linen Slim Pants",
+    "price": 90.45,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  },
+  {
+    "category": "upper_body",
+    "desc": "A textured short-sleeve shirt featuring a vertical woven pattern in neutral and blue tones, perfect for layering or wearing on its own.",
+    "image_url": "/catalog/textured_shirt.jpg",
+    "name": "Textured Woven Pattern Shirt",
+    "price": 79.9,
+    "sizes_available": ["XS", "S", "M", "L", "XL"]
+  }
+]
