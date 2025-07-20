@@ -1,74 +1,247 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Home } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Home,
+  Loader2,
+  Camera,
+} from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "sonner";
+
+// Define interfaces for our data
+interface SelectedItem {
+  name: string;
+  category: string;
+  image_url: string;
+  price: number;
+  desc: string;
+}
+
+interface TryOnResult {
+  success: boolean;
+  result_id: string;
+  result_image: string;
+  public_url: string;
+  category: string;
+  garment_description: string;
+  recommendations: {
+    item: SelectedItem;
+    reason: string;
+    score: number;
+  }[];
+  message: string;
+}
+
+interface TryOnState {
+  selectedItems?: SelectedItem[];
+  userPhoto?: string; // base64 image data from body detection
+  detectionData?: {
+    confidence: number;
+    frameCount: number;
+    detectionQuality: {
+      face_count: number;
+      body_count: number;
+      landmark_count: number;
+      brightness: number;
+    } | null;
+  };
+}
 
 const Final = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentCategory, setCurrentCategory] = useState("shirt");
   const [recommendationIndex, setRecommendationIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [tryonResult, setTryonResult] = useState<TryOnResult | null>(null);
+  const [currentTryonIndex, setCurrentTryonIndex] = useState(0);
 
+  // Get state passed from previous pages
+  const tryonState = location.state as TryOnState;
+  const selectedItems = tryonState?.selectedItems || [];
+  const userPhoto = tryonState?.userPhoto;
+  const detectionData = tryonState?.detectionData;
+
+  useEffect(() => {
+    // Check if we have both selected items and user photo
+    if (selectedItems.length > 0 && userPhoto) {
+      console.log("🎯 Starting try-on with captured user photo");
+      console.log(
+        `📊 Detection confidence: ${detectionData?.confidence || "unknown"}`
+      );
+      performTryOnForSelectedItems();
+    } else if (selectedItems.length > 0 && !userPhoto) {
+      toast.warning("No user photo available. Please capture a photo first.");
+      console.warn("⚠️ No user photo provided for try-on");
+    }
+  }, [selectedItems, userPhoto]);
+
+  const performTryOnForSelectedItems = async () => {
+    if (selectedItems.length === 0) {
+      toast.error("No items selected for try-on");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Try on the selected item using its image URL from the catalogue
+      const itemToTryOn = selectedItems[currentTryonIndex];
+
+      if (!userPhoto) {
+        throw new Error("No user photo available for try-on");
+      }
+
+      // Convert base64 data URL to a file for upload
+      const base64Data = userPhoto.replace(/^data:image\/[a-z]+;base64,/, "");
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "image/jpeg" });
+
+      // Convert relative URL to absolute URL for the backend
+      const garmentUrl = itemToTryOn.image_url.startsWith("http")
+        ? itemToTryOn.image_url
+        : `http://localhost:8080${itemToTryOn.image_url}`;
+
+      // Prepare form data for the tryon API
+      const formData = new FormData();
+      formData.append("person_image", blob, "user_photo.jpg");
+      formData.append("garment_url", garmentUrl);
+      formData.append("garment_description", itemToTryOn.desc);
+      formData.append("user_id", "user_123"); // In production, use actual user ID
+
+      console.log(`🔄 Starting try-on for: ${itemToTryOn.name}`);
+      console.log(`🔗 Garment URL: ${garmentUrl}`);
+      toast.info(`Trying on: ${itemToTryOn.name}...`);
+
+      // Make the API call to the tryon endpoint
+      const response = await fetch("http://127.0.0.1:5000/api/tryon", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data: TryOnResult = await response.json();
+
+      if (data.success) {
+        setTryonResult(data);
+        toast.success(`Try-on completed for ${itemToTryOn.name}!`);
+        console.log("✅ Try-on successful:", data);
+      } else {
+        throw new Error(data.message || "Try-on failed");
+      }
+    } catch (error) {
+      console.error("Try-on error:", error);
+      toast.error(
+        `Try-on failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+
+      // Show fallback UI
+      setTryonResult(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const tryNextItem = () => {
+    if (currentTryonIndex < selectedItems.length - 1) {
+      setCurrentTryonIndex((prev) => prev + 1);
+      setTryonResult(null); // Clear current result
+      performTryOnForSelectedItems(); // Try on next item
+    }
+  };
+
+  const tryPreviousItem = () => {
+    if (currentTryonIndex > 0) {
+      setCurrentTryonIndex((prev) => prev - 1);
+      setTryonResult(null); // Clear current result
+      performTryOnForSelectedItems(); // Try on previous item
+    }
+  };
+
+  // Fallback recommendations for when try-on is not available
   const recommendations = [
     {
       title: "Classic Sophistication",
-      description: "Try pairing this classic white button-down with dark chinos for a sophisticated casual look. The clean lines complement your features perfectly.",
+      description:
+        "Try pairing this classic white button-down with dark chinos for a sophisticated casual look. The clean lines complement your features perfectly.",
       image: "/lovable-uploads/47ddf8ec-e767-4383-ba70-1d2b84565232.png",
-      tags: ["Casual", "Professional", "Versatile"]
+      tags: ["Casual", "Professional", "Versatile"],
     },
     {
       title: "Modern Edge",
-      description: "A relaxed v-neck tee in soft cotton creates an effortless, approachable style. Perfect for weekend outings or casual meetings.",
+      description:
+        "A relaxed v-neck tee in soft cotton creates an effortless, approachable style. Perfect for weekend outings or casual meetings.",
       image: "/lovable-uploads/47ddf8ec-e767-4383-ba70-1d2b84565232.png",
-      tags: ["Relaxed", "Weekend", "Comfortable"]
+      tags: ["Relaxed", "Weekend", "Comfortable"],
     },
     {
       title: "Smart Casual",
-      description: "Elevate your look with a well-fitted polo shirt. This timeless piece bridges the gap between casual and formal beautifully.",
+      description:
+        "Elevate your look with a well-fitted polo shirt. This timeless piece bridges the gap between casual and formal beautifully.",
       image: "/lovable-uploads/47ddf8ec-e767-4383-ba70-1d2b84565232.png",
-      tags: ["Smart Casual", "Timeless", "Versatile"]
-    }
+      tags: ["Smart Casual", "Timeless", "Versatile"],
+    },
   ];
 
   const categories = [
     { id: "shirt", label: "Shirts", icon: "👕" },
     { id: "pants", label: "Pants", icon: "👖" },
     { id: "dresses", label: "Dresses", icon: "👗" },
-    { id: "accessories", label: "Accessories", icon: "👜" }
+    { id: "accessories", label: "Accessories", icon: "👜" },
   ];
 
   const alternativeItems = {
     shirt: [
       { name: "Linen Shirt", color: "White", price: "$89", match: "95%" },
       { name: "Cotton Polo", color: "Navy", price: "$65", match: "88%" },
-      { name: "Oxford Button-down", color: "Light Blue", price: "$95", match: "92%" }
+      {
+        name: "Oxford Button-down",
+        color: "Light Blue",
+        price: "$95",
+        match: "92%",
+      },
     ],
     pants: [
       { name: "Slim Chinos", color: "Khaki", price: "$75", match: "90%" },
       { name: "Dress Pants", color: "Charcoal", price: "$120", match: "87%" },
-      { name: "Dark Jeans", color: "Indigo", price: "$95", match: "85%" }
+      { name: "Dark Jeans", color: "Indigo", price: "$95", match: "85%" },
     ],
     dresses: [
       { name: "Midi Dress", color: "Black", price: "$140", match: "93%" },
       { name: "Wrap Dress", color: "Navy", price: "$110", match: "89%" },
-      { name: "Shirt Dress", color: "White", price: "$95", match: "91%" }
+      { name: "Shirt Dress", color: "White", price: "$95", match: "91%" },
     ],
     accessories: [
       { name: "Leather Belt", color: "Brown", price: "$45", match: "96%" },
       { name: "Canvas Bag", color: "Tan", price: "$85", match: "88%" },
-      { name: "Watch", color: "Silver", price: "$220", match: "94%" }
-    ]
+      { name: "Watch", color: "Silver", price: "$220", match: "94%" },
+    ],
   };
 
   const currentRecommendation = recommendations[recommendationIndex];
-  const currentAlternatives = alternativeItems[currentCategory as keyof typeof alternativeItems];
+  const currentAlternatives =
+    alternativeItems[currentCategory as keyof typeof alternativeItems];
+  const currentItem = selectedItems[currentTryonIndex];
 
   const nextRecommendation = () => {
     setRecommendationIndex((prev) => (prev + 1) % recommendations.length);
   };
 
   const prevRecommendation = () => {
-    setRecommendationIndex((prev) => (prev - 1 + recommendations.length) % recommendations.length);
+    setRecommendationIndex(
+      (prev) => (prev - 1 + recommendations.length) % recommendations.length
+    );
   };
 
   return (
@@ -76,26 +249,66 @@ const Final = () => {
       {/* Animated background elements */}
       <div className="absolute inset-0 opacity-20">
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary-glow/30 rounded-full blur-3xl animate-float"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-float" style={{animationDelay: '1.5s'}}></div>
+        <div
+          className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-float"
+          style={{ animationDelay: "1.5s" }}
+        ></div>
       </div>
 
       <div className="relative z-10 container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8 animate-fade-in">
-          <Button 
-            variant="glass" 
+          <Button
+            variant="glass"
             onClick={() => navigate("/")}
             className="flex items-center gap-2"
           >
             <Home className="w-4 h-4" />
             Return to Homepage
           </Button>
-          
+
           <div className="flex items-center gap-2 text-white">
             <Sparkles className="w-5 h-5 text-primary-glow" />
-            <h1 className="text-xl font-semibold">Style Journey</h1>
+            <h1 className="text-xl font-semibold">Virtual Try-On Results</h1>
           </div>
         </div>
+
+        {/* Current Item Info */}
+        {currentItem && (
+          <div className="text-center mb-6 text-white animate-fade-in">
+            <h2 className="text-2xl font-bold mb-2">
+              Trying On: {currentItem.name}
+            </h2>
+            <p className="text-white/80">{currentItem.desc}</p>
+            <div className="flex justify-center gap-4 mt-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={tryPreviousItem}
+                disabled={currentTryonIndex === 0 || loading}
+                className="text-white hover:bg-white/10"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous Item
+              </Button>
+              <span className="px-4 py-2 bg-white/10 rounded-lg text-sm">
+                {currentTryonIndex + 1} of {selectedItems.length}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={tryNextItem}
+                disabled={
+                  currentTryonIndex === selectedItems.length - 1 || loading
+                }
+                className="text-white hover:bg-white/10"
+              >
+                Next Item
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left Panel - Recommendation */}
@@ -130,7 +343,7 @@ const Final = () => {
                 <h3 className="text-lg font-medium text-primary-glow">
                   {currentRecommendation.title}
                 </h3>
-                
+
                 <p className="text-sm text-white/90 leading-relaxed">
                   {currentRecommendation.description}
                 </p>
@@ -147,43 +360,159 @@ const Final = () => {
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-white/70">
-                  <span>{recommendationIndex + 1} of {recommendations.length}</span>
+                  <span>
+                    {recommendationIndex + 1} of {recommendations.length}
+                  </span>
                   <span>AI Styled</span>
                 </div>
               </div>
             </Card>
 
-            {/* Style Confidence */}
-            <Card className="p-4 bg-white/10 backdrop-blur-md border-white/20 text-white animate-scale-in" style={{animationDelay: '0.2s'}}>
+            {/* Try-On Status */}
+            <Card
+              className="p-4 bg-white/10 backdrop-blur-md border-white/20 text-white animate-scale-in"
+              style={{ animationDelay: "0.2s" }}
+            >
               <h4 className="font-medium mb-3 text-sm flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary-glow" />
-                Style Confidence
+                Try-On Status
               </h4>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-white/10 rounded-full h-3">
-                  <div className="bg-gradient-primary h-3 rounded-full w-4/5 animate-pulse"></div>
+              {loading ? (
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary-glow" />
+                  <span className="text-sm">Processing try-on...</span>
                 </div>
-                <span className="text-sm font-semibold">92%</span>
-              </div>
-              <p className="text-xs text-white/70 mt-2">
-                This style matches your preferences perfectly
-              </p>
+              ) : tryonResult ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span className="text-sm">
+                      Try-on completed successfully!
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/70">
+                    Category: {tryonResult.category} | Result ID:{" "}
+                    {tryonResult.result_id.slice(0, 8)}...
+                  </p>
+                </div>
+              ) : userPhoto ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-sm">Ready for try-on</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="text-sm">No user photo available</span>
+                </div>
+              )}
             </Card>
+
+            {/* Detection Quality Info */}
+            {detectionData && (
+              <Card
+                className="p-4 bg-white/10 backdrop-blur-md border-white/20 text-white animate-scale-in"
+                style={{ animationDelay: "0.3s" }}
+              >
+                <h4 className="font-medium mb-3 text-sm flex items-center gap-2">
+                  📊 Detection Quality
+                </h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span>Confidence:</span>
+                    <span className="text-primary-glow font-medium">
+                      {(detectionData.confidence * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Frames processed:</span>
+                    <span>{detectionData.frameCount}</span>
+                  </div>
+                  {detectionData.detectionQuality && (
+                    <>
+                      <div className="flex justify-between">
+                        <span>Bodies detected:</span>
+                        <span>{detectionData.detectionQuality.body_count}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Faces detected:</span>
+                        <span>{detectionData.detectionQuality.face_count}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Center - Main Image */}
-          <div className="flex items-center justify-center animate-scale-in" style={{animationDelay: '0.3s'}}>
+          <div
+            className="flex items-center justify-center animate-scale-in"
+            style={{ animationDelay: "0.3s" }}
+          >
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-primary rounded-2xl blur-xl opacity-30 scale-110"></div>
               <Card className="relative overflow-hidden bg-white/5 backdrop-blur-sm border-white/20 p-2">
-                <img
-                  src={currentRecommendation.image}
-                  alt="Style recommendation"
-                  className="w-full max-w-sm h-96 object-cover rounded-xl"
-                />
+                {loading ? (
+                  <div className="w-full max-w-sm h-96 flex items-center justify-center bg-white/10 rounded-xl">
+                    <div className="text-center text-white">
+                      <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary-glow" />
+                      <p className="text-sm">Generating try-on image...</p>
+                      <p className="text-xs text-white/70 mt-2">
+                        This may take 30-60 seconds
+                      </p>
+                    </div>
+                  </div>
+                ) : tryonResult ? (
+                  <img
+                    src={`http://127.0.0.1:5000/${tryonResult.result_image}`}
+                    alt="Virtual try-on result"
+                    className="w-full max-w-sm h-96 object-cover rounded-xl"
+                    onError={(e) => {
+                      console.error("Failed to load try-on result image");
+                      // Fallback to placeholder
+                      const target = e.target as HTMLImageElement;
+                      target.src = currentRecommendation.image;
+                    }}
+                  />
+                ) : (
+                  <div className="w-full max-w-sm h-96 flex items-center justify-center bg-white/10 rounded-xl">
+                    <div className="text-center text-white">
+                      {userPhoto ? (
+                        <>
+                          <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary-glow" />
+                          <p className="text-sm">Ready for virtual try-on</p>
+                          <Button
+                            onClick={performTryOnForSelectedItems}
+                            variant="glass"
+                            className="mt-4"
+                            disabled={selectedItems.length === 0}
+                          >
+                            Try On Now
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="w-12 h-12 mx-auto mb-4 text-white/50" />
+                          <p className="text-sm mb-2">No photo captured</p>
+                          <p className="text-xs text-white/70 mb-4">
+                            Please capture your photo first
+                          </p>
+                          <Button
+                            onClick={() => navigate("/take_photo")}
+                            variant="glass"
+                            className="mt-4"
+                          >
+                            Capture Photo
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="absolute top-4 left-4">
                   <span className="px-3 py-1 bg-black/50 backdrop-blur-sm text-white text-xs rounded-full">
-                    Recommended Look
+                    {tryonResult ? "Virtual Try-On Result" : "Try-On Preview"}
                   </span>
                 </div>
               </Card>
@@ -191,11 +520,15 @@ const Final = () => {
           </div>
 
           {/* Right Panel - Alternative Items */}
-          <div className="space-y-4 animate-slide-in-right" style={{animationDelay: '0.4s'}}>
+          <div
+            className="space-y-4 animate-slide-in-right"
+            style={{ animationDelay: "0.4s" }}
+          >
             <div className="text-white mb-4">
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
                 <ArrowLeft className="w-4 h-4" />
-                Alternative {categories.find(c => c.id === currentCategory)?.label}
+                Alternative{" "}
+                {categories.find((c) => c.id === currentCategory)?.label}
               </h3>
             </div>
 
@@ -212,7 +545,9 @@ const Final = () => {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-sm">{item.price}</p>
-                      <p className="text-xs text-primary-glow">{item.match} match</p>
+                      <p className="text-xs text-primary-glow">
+                        {item.match} match
+                      </p>
                     </div>
                     <ChevronRight className="w-4 h-4 ml-2 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
@@ -227,13 +562,18 @@ const Final = () => {
         </div>
 
         {/* Category Navigation - Bottom */}
-        <div className="mt-12 animate-slide-in-right" style={{animationDelay: '0.5s'}}>
+        <div
+          className="mt-12 animate-slide-in-right"
+          style={{ animationDelay: "0.5s" }}
+        >
           <div className="flex justify-center">
             <div className="grid grid-cols-4 gap-4 max-w-md">
               {categories.map((category) => (
                 <Button
                   key={category.id}
-                  variant={currentCategory === category.id ? "glass" : "category"}
+                  variant={
+                    currentCategory === category.id ? "glass" : "category"
+                  }
                   onClick={() => setCurrentCategory(category.id)}
                   className="h-20 flex-col gap-2 text-white"
                 >

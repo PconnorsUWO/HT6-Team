@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 import sys
 import os
+import json
 
 # Add the parent directory to the Python path to access style_service module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,6 +17,54 @@ except ImportError as e:
     STYLE_SERVICE_AVAILABLE = False
 
 recommendations_bp = Blueprint('recommendations', __name__)
+
+def serialize_workflow_output(output):
+    """
+    Convert Vellum workflow output to JSON-serializable format
+    
+    Args:
+        output: The output from Vellum workflow execution
+        
+    Returns:
+        JSON-serializable dictionary
+    """
+    if output is None:
+        return None
+    
+    # If it's already a dict, try to serialize it to check for issues
+    if isinstance(output, dict):
+        try:
+            json.dumps(output)  # Test serialization
+            return output
+        except (TypeError, ValueError):
+            # If serialization fails, convert each value
+            serialized = {}
+            for key, value in output.items():
+                serialized[key] = serialize_workflow_output(value)
+            return serialized
+    
+    # If it's a list, serialize each item
+    elif isinstance(output, list):
+        return [serialize_workflow_output(item) for item in output]
+    
+    # If it has a __dict__ attribute (custom object), convert to dict
+    elif hasattr(output, '__dict__'):
+        try:
+            return serialize_workflow_output(output.__dict__)
+        except:
+            return str(output)
+    
+    # If it has a value attribute (Vellum output objects)
+    elif hasattr(output, 'value'):
+        return serialize_workflow_output(output.value)
+    
+    # For basic types that should be serializable
+    elif isinstance(output, (str, int, float, bool)) or output is None:
+        return output
+    
+    # Fallback: convert to string
+    else:
+        return str(output)
 
 @recommendations_bp.route('/style-recommendations', methods=['POST'])
 def get_style_recommendations():
@@ -45,10 +94,13 @@ def get_style_recommendations():
         # Execute the style workflow
         recommendations = service.execute_style_workflow(user_profile, catalogue_items)
         
+        # Ensure recommendations are JSON-serializable
+        serialized_recommendations = serialize_workflow_output(recommendations)
+        
         return jsonify({
             "success": True,
             "user_session_id": user_profile.session_id,
-            "recommendations": recommendations,
+            "recommendations": serialized_recommendations,
             "catalogue_count": len(catalogue_items),
             "message": "Style recommendations generated successfully"
         })
@@ -115,10 +167,13 @@ def get_quick_recommendations():
         # Execute the style workflow
         recommendations = service.execute_style_workflow(user_profile, catalogue_items)
         
+        # Ensure recommendations are JSON-serializable
+        serialized_recommendations = serialize_workflow_output(recommendations)
+        
         return jsonify({
             "success": True,
             "user_session_id": user_profile.session_id,
-            "recommendations": recommendations,
+            "recommendations": serialized_recommendations,
             "catalogue_count": len(catalogue_items),
             "message": "Quick style recommendations generated successfully"
         })

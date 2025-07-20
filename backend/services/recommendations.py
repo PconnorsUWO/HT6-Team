@@ -1,7 +1,6 @@
 import sys
 import os
 from config import Config
-from models import get_garment_by_id
 
 # Add the parent directory to the Python path to access style_service module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,7 +15,7 @@ except ImportError as e:
     CatalogueItem = None
     STYLE_SERVICE_AVAILABLE = False
 
-def generate_recommendations(garment_id, user_id, catalogue_items=None):
+def generate_recommendations(garment_url, garment_description, user_id, catalogue_items=None):
     """Generate clothing recommendations using Vellum AI with full catalog context"""
     try:
         if not STYLE_SERVICE_AVAILABLE or not VellumStyleService:
@@ -27,23 +26,10 @@ def generate_recommendations(garment_id, user_id, catalogue_items=None):
             print("Warning: VELLUM_API_KEY not configured")
             return []
         
-        # Get garment info for context
-        garment_info = None
-        if garment_id in [g['id'] for g in Config.PRESET_GARMENTS]:
-            garment_info = next(g for g in Config.PRESET_GARMENTS if g['id'] == garment_id)
-        else:
-            garment_doc = get_garment_by_id(garment_id)
-            if garment_doc:
-                garment_info = garment_doc
-        
-        if not garment_info:
-            print(f"Warning: Could not find garment info for {garment_id}")
-            return []
-        
         # Create a basic user profile for recommendations
         # In a real app, this would come from user data/preferences
         user_profile_data = {
-            'session_id': f"tryon_{user_id}_{garment_id}",
+            'session_id': f"tryon_{user_id}",
             'date': '',
             'style_words': ['modern', 'comfortable', 'stylish'],
             'style_message': 'Looking for complementary pieces',
@@ -56,7 +42,7 @@ def generate_recommendations(garment_id, user_id, catalogue_items=None):
             'dominant_colors': [],
             'accessory_preferences': [],
             'budget_range': '$50-150',
-            'notes': f'Finding items to complement {garment_info.get("name", "selected garment")}',
+            'notes': f'Finding items to complement selected garment',
             'standard_sizes': {},
             'body_measurements': {},
             'fit_preferences': [],
@@ -68,17 +54,10 @@ def generate_recommendations(garment_id, user_id, catalogue_items=None):
             'weather_tags': []
         }
         
-        # Use provided catalogue or fallback to preset garments
+        # Use provided catalogue items (should come from frontend with full catalogue.ts data)
         if not catalogue_items:
-            catalogue_items = [
-                {
-                    "name": garment['name'],
-                    "desc": garment['description'],
-                    "price": 99,  # Default price since preset garments don't have prices
-                    "sizes_available": ["XS", "S", "M", "L", "XL"]
-                }
-                for garment in Config.PRESET_GARMENTS
-            ]
+            print("Warning: No catalogue items provided - recommendations will be limited")
+            return []
         
         # Create VellumStyleService instance
         service = VellumStyleService()

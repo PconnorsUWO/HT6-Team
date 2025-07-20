@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,7 @@ interface RecommendationsData {
 
 const PickClothes: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>(
     []
@@ -44,6 +45,23 @@ const PickClothes: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isRetrying, setIsRetrying] = useState(false);
+
+  // Get user photo and detection data from previous step
+  const locationState = location.state as {
+    userPhoto?: string;
+    detectionData?: {
+      confidence: number;
+      frameCount: number;
+      detectionQuality: {
+        face_count: number;
+        body_count: number;
+        landmark_count: number;
+        brightness: number;
+      } | null;
+    };
+  };
+  const userPhoto = locationState?.userPhoto;
+  const detectionData = locationState?.detectionData;
 
   useEffect(() => {
     fetchRecommendations();
@@ -76,6 +94,8 @@ const PickClothes: React.FC = () => {
             response.recommendations.top_10 ||
             [];
 
+          console.log("recommendationsData", response.recommendations);
+
           const formattedRecommendations: RecommendationItem[] =
             recommendationsData.map(
               (rec: {
@@ -93,11 +113,20 @@ const PickClothes: React.FC = () => {
                   category: rec.item?.category || rec.category || "general",
                   desc:
                     rec.item?.desc || rec.desc || "No description available",
-                  image_url: rec.item?.image_url || rec.image_url || "",
+                  image_url:
+                    rec.item?.image_url ||
+                    // temporarily use image_url from the catalogue
+                    RecommendationsContext.find(
+                      (item) => item.name === rec.item?.name
+                    )?.image_url ||
+                    rec.image_url ||
+                    `https://picsum.photos/seed/${
+                      rec.item?.name || rec.name || "item"
+                    }/600/800`,
                   name: rec.item?.name || rec.name || "Unknown Item",
                   price: rec.item?.price || rec.price || 0,
-                  sizes_available:
-                    rec.item?.sizes_available || rec.sizes_available || [],
+                  sizes_available: rec.item?.sizes_available ||
+                    rec.sizes_available || ["S", "M", "L"],
                 },
                 reason:
                   rec.reason || "Recommended based on your style preferences",
@@ -155,7 +184,9 @@ const PickClothes: React.FC = () => {
                     image_url:
                       rec.item?.image_url ||
                       rec.image_url ||
-                      `https://picsum.photos/seed/${rec.name}/600/800`,
+                      `https://picsum.photos/seed/${
+                        rec.item?.name || rec.name || "item"
+                      }/600/800`,
                     name: rec.item?.name || rec.name || "Unknown Item",
                     price: rec.item?.price || rec.price || 0,
                     sizes_available: rec.item?.sizes_available ||
@@ -192,12 +223,16 @@ const PickClothes: React.FC = () => {
               item: {
                 category: item.category || "general",
                 desc: item.desc,
-                image_url: item.image_url,
+                image_url:
+                  item.image_url ||
+                  `https://picsum.photos/seed/${item.name}/600/800`,
                 name: item.name,
                 price: item.price,
                 sizes_available: item.sizes_available,
               },
-              reason: `Featured ${item.category} from our curated collection`,
+              reason: `Featured ${
+                item.category || "item"
+              } from our curated collection`,
               score: 85 + index * 2, // Vary scores slightly
             }));
 
@@ -221,9 +256,10 @@ const PickClothes: React.FC = () => {
         6
       ).map((item, index) => ({
         item: {
-          category: item.category,
+          category: item.category || "general",
           desc: item.desc,
-          image_url: item.image_url,
+          image_url:
+            item.image_url || `https://picsum.photos/seed/${item.name}/600/800`,
           name: item.name,
           price: item.price,
           sizes_available: item.sizes_available,
@@ -251,7 +287,7 @@ const PickClothes: React.FC = () => {
     selectedCategory === "all"
       ? recommendations
       : recommendations.filter((rec) => rec.item.category === selectedCategory);
-
+  console.log("filteredRecommendations", filteredRecommendations);
   const toggleItemSelection = (itemName: string) => {
     const newSelected = new Set(selectedItems);
     if (newSelected.has(itemName)) {
@@ -268,8 +304,27 @@ const PickClothes: React.FC = () => {
       return;
     }
 
+    // Prepare selected items data to pass to Final page
+    const selectedItemsData = recommendations
+      .filter((rec) => selectedItems.has(rec.item.name))
+      .map((rec) => ({
+        name: rec.item.name,
+        category: rec.item.category,
+        image_url: rec.item.image_url,
+        price: rec.item.price,
+        desc: rec.item.desc,
+      }));
+
     toast.success(`Selected ${selectedItems.size} items for your wardrobe!`);
-    navigate("/final");
+
+    // Navigate to final page with selected items data and user photo
+    navigate("/final", {
+      state: {
+        selectedItems: selectedItemsData,
+        userPhoto: userPhoto, // Pass the actual captured user photo
+        detectionData: detectionData, // Pass detection metadata
+      },
+    });
   };
 
   if (loading) {
@@ -338,12 +393,26 @@ const PickClothes: React.FC = () => {
             <h1 className="text-xl font-semibold">AI Style Recommendations</h1>
           </div>
 
-          <Badge
-            variant="secondary"
-            className="bg-primary/20 text-primary-glow border-primary-glow/30"
-          >
-            {recommendations.length} items found
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge
+              variant="secondary"
+              className="bg-primary/20 text-primary-glow border-primary-glow/30"
+            >
+              {recommendations.length} items found
+            </Badge>
+            {userPhoto && detectionData && (
+              <Badge
+                variant="secondary"
+                className="bg-green-500/20 text-green-400 border-green-400/30"
+                title={`Photo captured with ${(
+                  detectionData.confidence * 100
+                ).toFixed(1)}% confidence`}
+              >
+                📸 Photo captured ({(detectionData.confidence * 100).toFixed(0)}
+                %)
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Category Filter */}

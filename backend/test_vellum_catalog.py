@@ -31,7 +31,7 @@ def test_vellum_with_real_catalog():
             "name": "Vertical Stripe Short-Sleeve Shirt",
             "desc": "A bold short-sleeve shirt featuring vertical black and white stripes, perfect for a crisp summer look.",
             "price": 69.5,
-            "category": "shirts",
+            "category": "upper_body",
             "image_url": "/catalog/stripe_shirt.jpg",
             "sizes_available": ["XS", "S", "M", "L", "XL"]
         },
@@ -39,7 +39,7 @@ def test_vellum_with_real_catalog():
             "name": "Basic White Oversized T-Shirt",
             "desc": "Classic oversized white tee made from breathable cotton, ideal for layering or solo wear.",
             "price": 65.0,
-            "category": "shirts",
+            "category": "upper_body",
             "image_url": "/catalog/white_shirt.jpg",
             "sizes_available": ["XS", "S", "M", "L", "XL"]
         },
@@ -47,7 +47,7 @@ def test_vellum_with_real_catalog():
             "name": "Light Blue Relaxed Jeans",
             "desc": "Light-wash denim jeans with a relaxed fit and high-rise waist for laid-back everyday wear.",
             "price": 88.25,
-            "category": "pants", 
+            "category": "lower_body", 
             "image_url": "/catalog/jeans.jpg",
             "sizes_available": ["XS", "S", "M", "L", "XL"]
         }

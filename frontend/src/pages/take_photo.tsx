@@ -190,12 +190,12 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
 
       if (videoDevices.length >= 2) {
         // Use the second camera (index 1)
-        videoConstraints.deviceId = { exact: videoDevices[1].deviceId };
+        videoConstraints.deviceId = { exact: videoDevices[0].deviceId };
         console.log(
           "Using second camera:",
-          videoDevices[1].label || "Camera 2"
+          videoDevices[0].label || "Camera 2"
         );
-        toast.success(`Using camera: ${videoDevices[1].label || "Camera 2"}`);
+        toast.success(`Using camera: ${videoDevices[0].label || "Camera 2"}`);
       } else if (videoDevices.length === 1) {
         // Only one camera available, try environment facing (back camera)
         videoConstraints.facingMode = "environment";
@@ -275,9 +275,27 @@ const TakePhoto: React.FC<TakePhotoProps> = () => {
   };
 
   const proceedToNextStep = () => {
-    // Here you could pass the best frame data to the next page
-    // Navigate to clothing recommendations
-    navigate("/pick_clothes");
+    // Pass the captured frame data to the next page
+    const frameToPass = bestFrame || cleanFrame || currentFrame;
+
+    if (!frameToPass) {
+      toast.error("No photo captured. Please try the detection again.");
+      return;
+    }
+
+    console.log("🖼️ Passing captured frame to next step");
+
+    // Navigate to clothing recommendations with the captured user photo
+    navigate("/pick_clothes", {
+      state: {
+        userPhoto: frameToPass,
+        detectionData: {
+          confidence: confidence,
+          frameCount: frameCount,
+          detectionQuality: detectionQuality,
+        },
+      },
+    });
   };
 
   return (

@@ -6,9 +6,6 @@ import base64
 from PIL import Image
 from io import BytesIO
 from werkzeug.utils import secure_filename
-from models import save_tryon_result, get_garment_by_id
-from services.recommendations import generate_recommendations
-from models import get_user_history
 from utils import ensure_upload_folder, allowed_file
 from config import Config
 from datetime import datetime
@@ -32,54 +29,16 @@ def image_url_to_base64(image_url):
     image_data = response.content
     return base64.b64encode(image_data).decode('utf-8')
 
-def get_garment_path(garment_id):
-    """Get garment image path from preset or database"""
-    if garment_id in [g['id'] for g in Config.PRESET_GARMENTS]:
-        # Use preset garment
-        garment = next(g for g in Config.PRESET_GARMENTS if g['id'] == garment_id)
-        return garment['image_url']
-    else:
-        # Get custom garment from MongoDB
-        garment_doc = get_garment_by_id(garment_id)
-        if not garment_doc:
-            raise ValueError("Garment not found")
-        return garment_doc['filepath']
-
-def get_garment_description(garment_id):
-    """Get garment description for better try-on results"""
-    if garment_id in [g['id'] for g in Config.PRESET_GARMENTS]:
-        # Use preset garment description
-        garment = next(g for g in Config.PRESET_GARMENTS if g['id'] == garment_id)
-        return garment.get('description', garment['name'])
-    else:
-        # Get custom garment from MongoDB
-        garment_doc = get_garment_by_id(garment_id)
-        if garment_doc:
-            return garment_doc.get('description', 'Clothing item')
-        return 'Clothing item'
-
-def determine_category(garment_id):
-    """Determine the category of the garment for the API"""
-    # Default category mapping based on garment names/descriptions
+def determine_category_from_url(garment_url, garment_description=""):
+    """Determine the category of the garment from URL and description"""
+    # Default category mapping based on URL path and description
     category_keywords = {
-        'upper_body': ['shirt', 'blouse', 'jacket', 'blazer', 'top', 'sweater'],
-        'lower_body': ['jeans', 'pants', 'trousers', 'skirt'],
-        'dresses': ['dress', 'gown']
+        'upper_body': ['shirt', 'blouse', 'jacket', 'blazer', 'top', 'sweater', 'polo', 'button'],
+        'lower_body': ['jeans', 'pants', 'trousers', 'skirt', 'shorts'],
+        'dresses': ['dress', 'gown', 'jumpsuit']
     }
     
-    if garment_id in [g['id'] for g in Config.PRESET_GARMENTS]:
-        garment = next(g for g in Config.PRESET_GARMENTS if g['id'] == garment_id)
-        garment_name = garment['name'].lower()
-        garment_desc = garment.get('description', '').lower()
-    else:
-        garment_doc = get_garment_by_id(garment_id)
-        if garment_doc:
-            garment_name = garment_doc.get('name', '').lower()
-            garment_desc = garment_doc.get('description', '').lower()
-        else:
-            return 'upper_body'  # Default fallback
-    
-    text_to_check = f"{garment_name} {garment_desc}"
+    text_to_check = f"{garment_url} {garment_description}".lower()
     
     for category, keywords in category_keywords.items():
         if any(keyword in text_to_check for keyword in keywords):
@@ -89,7 +48,7 @@ def determine_category(garment_id):
 
 @tryon_bp.route('/tryon', methods=['POST'])
 def virtual_tryon():
-    """Virtual try-on endpoint using Segmind API"""
+    """Virtual try-on endpoint using Segmind API with direct garment URL"""
     try:
         # Check for uploaded person image
         if 'person_image' not in request.files:
@@ -102,11 +61,19 @@ def virtual_tryon():
         if not allowed_file(person_image_file.filename):
             return jsonify({"error": "Invalid file type. Only PNG, JPG, JPEG, GIF are allowed"}), 400
         
-        garment_id = request.form.get('garment_id')  # Can be preset or custom
+        # Get garment URL instead of garment_id
+        garment_url = request.form.get('garment_url')  
+        garment_description = request.form.get('garment_description', 'Clothing item')
         user_id = request.form.get('user_id', 'anonymous')
+
+        # print info received
+        print("garment_url", garment_url)
+        print("garment_description", garment_description)
+        print("user_id", user_id)   
+        print("person_image_file", person_image_file.filename)
         
-        if not garment_id:
-            return jsonify({"error": "garment_id is required"}), 400
+        if not garment_url:
+            return jsonify({"error": "garment_url is required"}), 400
         
         # Check if API key is configured
         if SEGMIND_API_KEY == 'YOUR_API_KEY':
@@ -124,18 +91,15 @@ def virtual_tryon():
         person_image_file.save(filepath)
         
         try:
-            # Get garment information
-            garment_path = get_garment_path(garment_id)
-            garment_description = get_garment_description(garment_id)
-            category = determine_category(garment_id)
+            # Determine category from URL and description
+            category = determine_category_from_url(garment_url, garment_description)
             
             # Convert images to base64
             person_b64 = image_file_to_base64(filepath)
             
-            if garment_path.startswith('http'):
-                garment_b64 = image_url_to_base64(garment_path)
-            else:
-                garment_b64 = image_file_to_base64(garment_path)
+            # Always treat garment_url as a URL (since it comes from frontend)
+            print(f"🔄 Fetching garment image from URL: {garment_url}")
+            garment_b64 = image_url_to_base64(garment_url)
             
             # Prepare API request data
             data = {
@@ -172,31 +136,19 @@ def virtual_tryon():
             image = Image.open(BytesIO(image_data))
             image.save(output_path, 'PNG')
             
-            # Save to database
+            # Create result data (no database save since we're not using MongoDB)
             result_data = {
                 "id": result_id,
                 "user_id": user_id,
-                "garment_id": garment_id,
+                "garment_url": garment_url,
+                "garment_description": garment_description,
                 "original_image": filepath,
                 "result_image": output_path,
-                "masked_image": output_path,
-                "created_at": datetime.utcnow(),
+                "created_at": datetime.utcnow().isoformat(),
                 "public_url": f"https://your-domain.com/results/{result_id}.png",
                 "api_provider": "segmind",
-                "category": category,
-                "garment_description": garment_description
+                "category": category
             }
-            
-            save_tryon_result(result_data)
-            
-            # Generate recommendations using Vellum with real catalog
-            # TODO: In production, get the real catalog from database or frontend
-            # For now, using preset garments as catalog
-            try:
-                recommendations = generate_recommendations(garment_id, user_id)
-            except Exception as e:
-                print(f"Warning: Could not generate recommendations: {e}")
-                recommendations = []
             
             print(f"✅ Virtual try-on completed successfully using Segmind API")
             
@@ -209,12 +161,12 @@ def virtual_tryon():
                 "category": category,
                 "api_provider": "segmind",
                 "garment_description": garment_description,
-                "recommendations": recommendations,
+                "garment_url": garment_url,
                 "message": "Virtual try-on completed successfully"
             })
             
         except requests.exceptions.RequestException as e:
-            error_msg = f"Segmind API request failed: {str(e)}"
+            error_msg = f"API request failed: {str(e)}"
             if hasattr(e, 'response') and e.response is not None:
                 try:
                     error_detail = e.response.json()
@@ -233,20 +185,6 @@ def virtual_tryon():
                 os.remove(filepath)
             except Exception as e:
                 print(f"Warning: Could not clean up temporary file {filepath}: {e}")
-        
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-@tryon_bp.route('/user-history/<user_id>', methods=['GET'])
-def get_user_history_route(user_id):
-    """Get user's try-on history"""
-    try:
-        history = get_user_history(user_id)
-        
-        return jsonify({
-            "success": True,
-            "history": history
-        })
         
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500 
