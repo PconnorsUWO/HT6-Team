@@ -1,3 +1,4 @@
+.env
 backend/.env
 backend/uploads/*
 
@@ -43,3 +44,5 @@ wheels/
 # Tests
 
 backend/tests/
+
+*.env
